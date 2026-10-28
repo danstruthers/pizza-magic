@@ -24,6 +24,16 @@ public static class Problems
         return Result(problem);
     }
 
+    /// <summary>Re-types a problem and attaches the fresh quote, so the client can show the new price or promo state.</summary>
+    public static ObjectResult WithQuote(ObjectResult result, string type, string title, QuoteResponse currentQuote)
+    {
+        var problem = (ProblemDetails)result.Value!;
+        problem.Type = type;
+        problem.Title = title;
+        problem.Extensions["currentQuote"] = currentQuote;
+        return result;
+    }
+
     public static ObjectResult Of(string type, int status, string title, string? detail = null) =>
         Result(new ProblemDetails { Type = type, Title = title, Status = status, Detail = detail });
 

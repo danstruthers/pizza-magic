@@ -76,3 +76,15 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - Two tests compared records that hold lists with `ShouldBe` / `ShouldBeEquivalentTo`. That compares the list by reference, and the equivalence check also compares collection types (array vs List). This is the same trap as in M5. Those assertions now compare the scalar fields and the list separately.
 
 **Verified rather than trusted:** the running service was exercised with curl: the menu grid, and the P24 quote (both codes) returning 3148 with ILOVEPIZZA Applied, SAVE5 Rejected and the expected description. The README's curl command was also run verbatim and returned 3148.
+
+## 2026-10-28: M10 order submission
+
+**Fixed AI output:**
+- The stored-order view first looked allocations up by database id. The submit path builds the response before saving (so the replay body can be stored in the same transaction), when every id is still 0, so the lookups collided. It now uses the navigation properties, which are set in memory and `Include`d on reads.
+- The first `Transaction_is_immediate` test used `Default Timeout=0` for the second writer, expecting "fail immediately". In ADO.NET, 0 means wait forever, so the test hung. It now uses 1 second.
+- Two tests read the database directly before the in-process host had started (and created the schema). The helpers now start the host first.
+- `DescriptionSource` referred to `Promotions.PromoStatus`, which C# resolved to the record's own `Promotions` property instead of the namespace.
+
+**Verified rather than trusted:**
+- Disabling both the re-check inside the IMMEDIATE transaction and the primary-key backstop makes `Fifty_parallel_submissions_with_one_key_create_one_order` fail, while the sequential replay test still passes. The race test therefore really exercises the in-lock guard. Both guards were restored, and a search confirms no `false &&` remains.
+- On the running service: submit returned 201 with ETag and Location, a retry with the same key returned the same order with `Idempotent-Replayed: true`, status showed the local PDT time, the description came from the snapshot, and a stale total returned 409.

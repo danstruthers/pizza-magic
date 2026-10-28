@@ -46,3 +46,40 @@ Content-Type: application/json
                    "toppings": [ { "code": "PEPPERONI", "portion": "LEFT" } ] } ],
   "tip": { "mode": "Amount", "value": "1.234" }
 }
+
+### Submit P9 (Idempotency-Key required; repeat the same request to see the replay: same order, Idempotent-Replayed: true)
+# @name submit
+POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/orders
+Content-Type: application/json
+Idempotency-Key: try-it-1
+
+{
+  "lineItems": [ { "kind": "Pizza", "sizeCode": "LARGE", "quantity": 2,
+                   "toppings": [ { "code": "PEPPERONI" }, { "code": "BACON" } ] } ],
+  "promoCodes": [ "ILOVEPIZZA" ],
+  "tip": { "mode": "Percent", "value": "15" },
+  "expectedTotalCents": 3148,
+  "customerName": "Dana"
+}
+
+### The stored order (never re-priced)
+GET {{PizzaMagic.OrderManager_HostAddress}}/api/v1/orders/{{submit.response.body.$.orderId}}
+
+### Light status for polling
+GET {{PizzaMagic.OrderManager_HostAddress}}/api/v1/orders/{{submit.response.body.$.orderId}}/status
+
+### Written description (text/plain)
+GET {{PizzaMagic.OrderManager_HostAddress}}/api/v1/orders/{{submit.response.body.$.orderId}}/description
+
+### Stale expectedTotalCents: 409 price-changed with the current quote; no order is created
+POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/orders
+Content-Type: application/json
+Idempotency-Key: try-it-2
+
+{
+  "lineItems": [ { "kind": "Pizza", "sizeCode": "LARGE", "quantity": 2,
+                   "toppings": [ { "code": "PEPPERONI" }, { "code": "BACON" } ] } ],
+  "promoCodes": [ "ILOVEPIZZA" ],
+  "tip": { "mode": "Percent", "value": "15" },
+  "expectedTotalCents": 3100
+}

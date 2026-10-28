@@ -81,6 +81,7 @@ public class OrderParityTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var request = id == "P13"
             ? new SubmitOrderRequest(null, null, [Pizza("SMALL", 4)], ["SAVE5"], null, 2130, null)
             : new SubmitOrderRequest(null, null, [], null, Percent("18"), 0, null);
+        _ = factory.Server;   // start the host (and create the database) before reading it directly
         await using var connection = new SqliteConnection(factory.ConnectionString);
         await connection.OpenAsync();
         await using var count = connection.CreateCommand();

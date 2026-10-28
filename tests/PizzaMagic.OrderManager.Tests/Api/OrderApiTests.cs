@@ -29,6 +29,7 @@ public class OrderApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private async Task<long> CountAsync(string sql)
     {
+        _ = factory.Server;   // start the host (and create the database) before reading it directly
         await using var connection = new SqliteConnection(factory.ConnectionString);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();

@@ -21,6 +21,14 @@ builder.Services.AddScoped(services =>
 builder.Services.AddSingleton(services =>
     new PricingEngine(new PromotionEngine(services.GetRequiredService<PromotionRegistry>(), new RejectLaterConflicts())));
 builder.Services.AddScoped<OrderPricer>();
+builder.Services.AddScoped(services => new OrderService(
+    services.GetRequiredService<PizzaMagicDbContext>(),
+    services.GetRequiredService<OrderPricer>(),
+    services.GetRequiredService<CatalogLoader>(),
+    services.GetRequiredService<TimeProvider>(),
+    // The stored replay body must be serialized exactly as controller responses are.
+    services.GetRequiredService<Microsoft.Extensions.Options.IOptions<JsonOptions>>().Value.JsonSerializerOptions,
+    services.GetRequiredService<IConfiguration>()));
 
 builder.Services.AddProblemDetails();
 // Request fields are nullable on purpose: the Domain validator reports every problem with its path.

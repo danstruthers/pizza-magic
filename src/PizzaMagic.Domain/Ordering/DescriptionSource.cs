@@ -1,6 +1,7 @@
 using PizzaMagic.Domain.Catalog;
 using PizzaMagic.Domain.Monetary;
 using PizzaMagic.Domain.Pricing;
+using PizzaMagic.Domain.Promotions;
 
 namespace PizzaMagic.Domain.Ordering;
 
@@ -30,7 +31,9 @@ public sealed record DescriptionSource(
             l.Line.Components.Where(c => c.Kind == ComponentKind.Topping).Select(c => c.Product.DisplayName).ToList(),
             l.Line.LineTotal.Cents)).ToList();
 
-        var promotions = breakdown.Promotions.AppliedInOrder
+        // Entry order, as stored orders list them, so a quote and its order describe promotions identically.
+        var promotions = breakdown.Promotions.Outcomes
+            .Where(o => o.Status == PromoStatus.Applied)
             .Select(o => new DescribedPromotion(o.Code!, o.Discount.Cents))
             .ToList();
 

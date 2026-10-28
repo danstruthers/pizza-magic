@@ -26,6 +26,12 @@ public sealed class PizzaMagicDbContext(DbContextOptions<PizzaMagicDbContext> op
     public DbSet<PromotionIncompatibilityEntity> PromotionIncompatibilities => Set<PromotionIncompatibilityEntity>();
     public DbSet<PromotionRestaurantEntity> PromotionRestaurants => Set<PromotionRestaurantEntity>();
     public DbSet<DataScriptLogEntity> DataScriptLog => Set<DataScriptLogEntity>();
+    public DbSet<CustomerOrderEntity> Orders => Set<CustomerOrderEntity>();
+    public DbSet<OrderLineEntity> OrderLines => Set<OrderLineEntity>();
+    public DbSet<OrderPromotionEntity> OrderPromotions => Set<OrderPromotionEntity>();
+    public DbSet<OrderTaxLineEntity> OrderTaxLines => Set<OrderTaxLineEntity>();
+    public DbSet<OrderStatusHistoryEntity> OrderStatusHistory => Set<OrderStatusHistoryEntity>();
+    public DbSet<IdempotencyRecordEntity> IdempotencyRecords => Set<IdempotencyRecordEntity>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -46,6 +52,36 @@ public sealed class PizzaMagicDbContext(DbContextOptions<PizzaMagicDbContext> op
         model.Entity<PromotionIncompatibilityEntity>().ToTable("promotion_incompatibility").HasKey(p => new { p.PromotionIdLow, p.PromotionIdHigh });
         model.Entity<PromotionRestaurantEntity>().ToTable("promotion_restaurant").HasKey(p => new { p.PromotionId, p.RestaurantId });
         model.Entity<DataScriptLogEntity>().ToTable("data_script_log").HasKey(l => l.Name);
+
+        // Orders. No EF concurrency token: versions are bumped by explicit conditional UPDATEs (section 2.10).
+        model.Entity<CustomerOrderEntity>(order =>
+        {
+            order.ToTable("customer_order");
+            order.HasMany(o => o.Lines).WithOne().HasForeignKey(l => l.OrderId);
+            order.HasMany(o => o.Promotions).WithOne().HasForeignKey(p => p.OrderId);
+            order.HasMany(o => o.TaxLines).WithOne().HasForeignKey(t => t.OrderId);
+            order.HasMany(o => o.History).WithOne().HasForeignKey(h => h.OrderId);
+        });
+        model.Entity<OrderLineEntity>(line =>
+        {
+            line.ToTable("order_line");
+            line.HasMany(l => l.Toppings).WithOne().HasForeignKey(t => t.OrderLineId);
+        });
+        model.Entity<OrderLineToppingEntity>().ToTable("order_line_topping");
+        model.Entity<OrderPromotionEntity>(promotion =>
+        {
+            promotion.ToTable("order_promotion");
+            promotion.HasMany(p => p.Allocations).WithOne().HasForeignKey(a => a.OrderPromotionId);
+        });
+        model.Entity<OrderDiscountAllocationEntity>(allocation =>
+        {
+            allocation.ToTable("order_discount_allocation");
+            allocation.HasOne(a => a.OrderLine).WithMany().HasForeignKey(a => a.OrderLineId);
+            allocation.HasOne(a => a.OrderLineTopping).WithMany().HasForeignKey(a => a.OrderLineToppingId);
+        });
+        model.Entity<OrderTaxLineEntity>().ToTable("order_tax_line");
+        model.Entity<OrderStatusHistoryEntity>().ToTable("order_status_history");
+        model.Entity<IdempotencyRecordEntity>().ToTable("idempotency_record").HasKey(r => new { r.IdempotencyKey, r.Operation });
 
         ApplyTimeConverters(model);
     }

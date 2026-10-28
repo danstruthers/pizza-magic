@@ -22,6 +22,8 @@ public sealed class ApiFactory : WebApplicationFactory<OrderManagerMarker>
 
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "pizzamagic-tests", Guid.NewGuid().ToString("N"));
 
+    public ApiFactory() => Directory.CreateDirectory(_directory);
+
     public FakeTimeProvider Clock { get; } = new(TestDatabase.DefaultNow);
 
     public string ConnectionString => $"Data Source={Path.Combine(_directory, "api.db")};Default Timeout=5;Pooling=False";
