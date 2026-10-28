@@ -8,14 +8,6 @@ namespace PizzaMagic.Web.Tests.Builder;
 
 public class BuilderTests
 {
-    private static object Draft(long revision, string size, params string[] codes) => new
-    {
-        revision,
-        lineItems = new[] { new { kind = "Pizza", sizeCode = size, quantity = 1, toppings = new[] { new { code = "PEPPERONI" } } } },
-        promoCodes = codes,
-        tip = (object?)null,
-    };
-
     // Nothing is hard-coded: a size that only exists in the service's menu is rendered with its price.
     [Fact]
     public async Task Builder_renders_menu_from_service()
@@ -56,7 +48,7 @@ public class BuilderTests
         var client = factory.CreateClient();
         await client.GetAsync("/");
 
-        var response = await WebFactory.PostQuoteAsync(client, "not-a-token", Draft(1, "SMALL"));
+        var response = await WebFactory.PostQuoteAsync(client, "not-a-token", WebFactory.Draft(1, "SMALL"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         factory.OrderManager.QuoteRequests.ShouldBeEmpty();
@@ -69,8 +61,8 @@ public class BuilderTests
         await using var factory = new WebFactory();
         var (client, token) = await factory.BrowserAsync();
 
-        var newer = await WebFactory.PostQuoteAsync(client, token, Draft(2, "SMALL"));
-        var older = await WebFactory.PostQuoteAsync(client, token, Draft(1, "LARGE"));
+        var newer = await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(2, "SMALL"));
+        var older = await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(1, "LARGE"));
 
         newer.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await newer.Content.ReadFromJsonAsync<QuoteResponse>(WebFactory.Json))!.TotalCents.ShouldBe(533);
@@ -88,7 +80,7 @@ public class BuilderTests
         await using var factory = new WebFactory();
         var (client, token) = await factory.BrowserAsync();
 
-        await WebFactory.PostQuoteAsync(client, token, Draft(1, "SMALL"));
+        await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(1, "SMALL"));
 
         var sent = factory.OrderManager.QuoteRequests.Single();
         sent.RestaurantId.ShouldBeNull();   // empty OrderManager:RestaurantId = the service's default restaurant
@@ -102,7 +94,7 @@ public class BuilderTests
         factory.OrderManager.Quote = _ => ApiResult<QuoteResponse>.Unavailable("timeout");
         var (client, token) = await factory.BrowserAsync();
 
-        var response = await WebFactory.PostQuoteAsync(client, token, Draft(1, "SMALL"));
+        var response = await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(1, "SMALL"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("message").GetString()
@@ -121,7 +113,7 @@ public class BuilderTests
             new ApiProblem(ProblemTypes.Validation, 422, "The order has invalid fields.", null, errors, JsonDocument.Parse("{}").RootElement));
         var (client, token) = await factory.BrowserAsync();
 
-        var response = await WebFactory.PostQuoteAsync(client, token, Draft(1, "SMALL"));
+        var response = await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(1, "SMALL"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -137,7 +129,7 @@ public class BuilderTests
         factory.OrderManager.Quote = _ => ApiResult<QuoteResponse>.Success(Quotes.Simple(3148, normalizedCodes: ["ILOVEPIZZA"]), null, false);
         var (client, token) = await factory.BrowserAsync();
 
-        await WebFactory.PostQuoteAsync(client, token, Draft(1, "LARGE", "ILOVEPIZZA", "SAVE5"));
+        await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(1, "LARGE", "ILOVEPIZZA", "SAVE5"));
 
         var cart = WebFactory.RenderedCart(await client.GetStringAsync("/"));
         cart.GetProperty("promoCodes").EnumerateArray().Select(c => c.GetString()).ShouldBe(["ILOVEPIZZA"]);

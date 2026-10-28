@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PizzaMagic.Contracts.Api;
 using PizzaMagic.Web.Clients;
 
@@ -20,17 +21,46 @@ public sealed class FakeOrderManagerClient : IOrderManagerClient
         return Task.FromResult(Quote(draft));
     }
 
-    public Task<ApiResult<OrderResponse>> SubmitAsync(SubmitOrderRequest request, string idempotencyKey, CancellationToken cancellationToken) =>
-        throw new NotSupportedException("Not used by the builder (M14).");
+    public Func<SubmitOrderRequest, string, ApiResult<OrderResponse>> Submit { get; set; } =
+        (_, _) => ApiResult<OrderResponse>.Success(SampleOrders.Order(), "\"1\"", false);
 
-    public Task<ApiResult<OrderResponse>> GetOrderAsync(Guid orderId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public List<(SubmitOrderRequest Request, string Key)> SubmitRequests { get; } = [];
 
-    public Task<ApiResult<OrderStatusResponse>> GetStatusAsync(Guid orderId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Func<Guid, ApiResult<OrderResponse>> Order { get; set; } = id => ApiResult<OrderResponse>.Success(SampleOrders.Order(id: id), "\"1\"", false);
 
-    public Task<ApiResult<OrderResponse>> UpdateAsync(Guid orderId, int version, UpdateOrderRequest request, string idempotencyKey, CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+    public Func<Guid, ApiResult<OrderStatusResponse>> Status { get; set; } = id => ApiResult<OrderStatusResponse>.Success(SampleOrders.Status(id: id), "\"1\"", false);
 
-    public Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Func<Guid, int, UpdateOrderRequest, string, ApiResult<OrderResponse>> Update { get; set; } =
+        (id, version, _, _) => ApiResult<OrderResponse>.Success(SampleOrders.Order(version: version + 1, id: id), null, false);
+
+    public List<(Guid Id, int Version, UpdateOrderRequest Request, string Key)> UpdateRequests { get; } = [];
+
+    public Func<Guid, ApiResult<OrderResponse>> Cancel { get; set; } =
+        id => ApiResult<OrderResponse>.Success(SampleOrders.Order("Cancelled", 2, id: id), null, false);
+
+    public List<Guid> CancelRequests { get; } = [];
+
+    public Task<ApiResult<OrderResponse>> SubmitAsync(SubmitOrderRequest request, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        SubmitRequests.Add((request, idempotencyKey));
+        return Task.FromResult(Submit(request, idempotencyKey));
+    }
+
+    public Task<ApiResult<OrderResponse>> GetOrderAsync(Guid orderId, CancellationToken cancellationToken) => Task.FromResult(Order(orderId));
+
+    public Task<ApiResult<OrderStatusResponse>> GetStatusAsync(Guid orderId, CancellationToken cancellationToken) => Task.FromResult(Status(orderId));
+
+    public Task<ApiResult<OrderResponse>> UpdateAsync(Guid orderId, int version, UpdateOrderRequest request, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        UpdateRequests.Add((orderId, version, request, idempotencyKey));
+        return Task.FromResult(Update(orderId, version, request, idempotencyKey));
+    }
+
+    public Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        CancelRequests.Add(orderId);
+        return Task.FromResult(Cancel(orderId));
+    }
 }
 
 public static class Menus
@@ -54,8 +84,66 @@ public static class Menus
 
 public static class Quotes
 {
-    public static QuoteResponse Simple(long total, bool canSubmit = true, IReadOnlyList<string>? normalizedCodes = null) => new(
-        1, "ONLINE", [], total, [], normalizedCodes ?? [], 0, total, new TaxRoundingResponse("HALF_UP", "COMBINED"), [], 0, total,
-        new TipResponse("None", null, null, 0, null), total, [],
-        new NormalizedDraftResponse("ONLINE", [], normalizedCodes ?? [], null), canSubmit, $"Total: {total}");
+    /// <summary>A Large pizza with Pepperoni as the server normalizes it: explicit crust, sauce, portion and multiplier.</summary>
+    public static readonly LineItemRequest NormalizedLarge =
+        new("Pizza", "LARGE", 1, [new ToppingRequest("PEPPERONI", "WHOLE", 1)], "HAND_TOSSED", "CLASSIC_TOMATO");
+
+    public static QuoteResponse Simple(
+        long total,
+        bool canSubmit = true,
+        IReadOnlyList<string>? normalizedCodes = null,
+        IReadOnlyList<LineItemRequest>? normalizedLines = null,
+        IReadOnlyList<PromotionOutcomeResponse>? promotions = null,
+        IReadOnlyList<IssueResponse>? issues = null) => new(
+        1, "ONLINE", [], total, promotions ?? [], normalizedCodes ?? [], 0, total, new TaxRoundingResponse("HALF_UP", "COMBINED"), [], 0, total,
+        new TipResponse("None", null, null, 0, null), total, issues ?? [],
+        new NormalizedDraftResponse("ONLINE", normalizedLines ?? [], normalizedCodes ?? [], null), canSubmit, $"Total: {total}");
+}
+
+public static class SampleOrders
+{
+    public static readonly Guid Id = Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e");
+
+    private static readonly QuoteLineResponse LargePepperoni = new(
+        0, 1, "Pizza", 1,
+        new PricedProductResponse("LARGE", "Large", 1200, "Global"),
+        new PricedChoiceResponse("HAND_TOSSED", "Hand tossed", 0, true),
+        new PricedChoiceResponse("CLASSIC_TOMATO", "Classic tomato", 0, true),
+        [new PricedToppingResponse("PEPPERONI", "Pepperoni", "BASIC", "WHOLE", "whole", 1, "GlobalTier", 96, 1_000_000, 96, 96)],
+        1296, 1296, 0, [], "1 x Large pizza with Pepperoni");
+
+    private static string Display(string status) => status switch
+    {
+        "NotStarted" => "Not Started",
+        "ReadyForPickup" => "Ready for Pickup",
+        _ => status,
+    };
+
+    private static IReadOnlyList<string> Actions(string status) => status == "NotStarted" ? ["update", "cancel"] : [];
+
+    /// <summary>1 Large Pepperoni: subtotal $12.96, tax $0.84 (6.5%), total $13.80.</summary>
+    public static OrderResponse Order(string status = "NotStarted", int version = 1, Guid? id = null) => new(
+        (id ?? Id).ToString(), 1, "ONLINE", null, status, Display(status), version,
+        "2026-10-28T19:00:00.000Z", "2026-10-28T19:05:00.000Z",
+        new LocalTimeResponse("2026-10-28T12:00:00", -420, "PDT"), new LocalTimeResponse("2026-10-28T12:05:00", -420, "PDT"),
+        Actions(status),
+        new OrderPricingResponse([LargePepperoni], 1296, [], 0, 1296, new TaxRoundingResponse("HALF_UP", "COMBINED"), [], 84, 1380,
+            new TipResponse("None", null, null, 0, null), 1380),
+        "1 x Large pizza with Pepperoni\nTax: $0.84\nTotal: $13.80");
+
+    public static OrderStatusResponse Status(string status = "Started", int version = 2, Guid? id = null) => new(
+        (id ?? Id).ToString(), status, Display(status), version, "2026-10-28T19:05:00.000Z",
+        new LocalTimeResponse("2026-10-28T12:05:00", -420, "PDT"), Actions(status));
+}
+
+public static class Problems
+{
+    public static ApiProblem Of(
+        string type,
+        int status,
+        string? detail = null,
+        object? extensions = null,
+        IReadOnlyDictionary<string, IReadOnlyList<FieldErrorResponse>>? errors = null) =>
+        new(type, status, null, detail, errors ?? new Dictionary<string, IReadOnlyList<FieldErrorResponse>>(),
+            JsonSerializer.SerializeToElement(extensions ?? new { }, WebFactory.Json));
 }

@@ -63,6 +63,11 @@ public sealed class BuilderController(IOrderManagerClient orderManager, IConfigu
         };
     }
 
+    /// <summary>Empties the cart and leaves edit mode (not while an order is waiting for confirmation). M14 red stub.</summary>
+    [HttpPost("/Builder/StartOver")]
+    [ValidateAntiForgeryToken]
+    public IActionResult StartOver() => throw new NotImplementedException();
+
     private long? RestaurantId() =>
         long.TryParse(configuration["OrderManager:RestaurantId"], out var id) ? id : null;
 }
