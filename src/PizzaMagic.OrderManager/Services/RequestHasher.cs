@@ -15,6 +15,7 @@ namespace PizzaMagic.OrderManager.Services;
 public static class RequestHasher
 {
     public const string CreateOperation = "CreateOrder";
+    public const string UpdateOperation = "UpdateOrder";
 
     private sealed record CanonicalTopping(string Code, string Portion, int Multiplier);
 
@@ -22,6 +23,8 @@ public static class RequestHasher
 
     private sealed record Canonical(
         string Operation,
+        string? OrderId,
+        string? IfMatch,
         long? RestaurantId,
         string? Channel,
         IReadOnlyList<CanonicalLine> Lines,
@@ -32,10 +35,16 @@ public static class RequestHasher
         string? CustomerName);
 
     public static string HashCreate(SubmitOrderRequest request) => Hash(new Canonical(
-        CreateOperation,
-        request.RestaurantId,
-        Code(request.Channel),
-        (request.LineItems ?? []).Select(l => new CanonicalLine(
+        CreateOperation, null, null, request.RestaurantId, Code(request.Channel), Lines(request.LineItems), Codes(request.PromoCodes),
+        Code(request.Tip?.Mode), request.Tip?.Value, request.ExpectedTotalCents, request.CustomerName?.Trim()));
+
+    /// <summary>An update's hash also covers the order id and the If-Match value (section 2.11).</summary>
+    public static string HashUpdate(Guid orderId, string ifMatch, UpdateOrderRequest request) => Hash(new Canonical(
+        UpdateOperation, orderId.ToString(), ifMatch.Trim(), null, null, Lines(request.LineItems), Codes(request.PromoCodes),
+        Code(request.Tip?.Mode), request.Tip?.Value, request.ExpectedTotalCents, request.CustomerName?.Trim()));
+
+    private static List<CanonicalLine> Lines(IReadOnlyList<LineItemRequest>? lines) =>
+        (lines ?? []).Select(l => new CanonicalLine(
             Code(l.Kind) ?? "",
             Code(l.SizeCode) ?? "",
             l.Quantity,
@@ -45,12 +54,9 @@ public static class RequestHasher
             (l.Toppings ?? []).Select(t => new CanonicalTopping(
                 Code(t.Code) ?? "",
                 Code(t.Portion) ?? DraftValidator.WholePortionCode,
-                t.Multiplier ?? 1)).ToList())).ToList(),
-        (request.PromoCodes ?? []).Select(c => Code(c) ?? "").ToList(),
-        Code(request.Tip?.Mode),
-        request.Tip?.Value,
-        request.ExpectedTotalCents,
-        request.CustomerName?.Trim()));
+                t.Multiplier ?? 1)).ToList())).ToList();
+
+    private static List<string> Codes(IReadOnlyList<string>? codes) => (codes ?? []).Select(c => Code(c) ?? "").ToList();
 
     private static string? Code(string? value) => value?.Trim().ToUpperInvariant();
 

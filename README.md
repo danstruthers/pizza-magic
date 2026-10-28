@@ -13,7 +13,7 @@ The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](
 
 ## Current status
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M10**: the whole pricing core, the order description, the order state machine, the database, the menu and quote API, and order submission (idempotent, price-checked) with order, status and description reads. Update, cancel and the kitchen come in M11 and the order builder screens in M12-M14.
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M11**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder screens come in M12-M14.
 
 | Milestone | What it adds | Status |
 |---|---|---|
@@ -28,8 +28,8 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 | M8 | Database: full SQLite schema, seed scripts (menu, WA tax, promos, time zones), startup validation | Done |
 | M9 | API: `GET /api/v1/menu` and `POST /api/v1/quotes` (live pricing with validation errors by field) | Done |
 | M10 | Order API: idempotent submit (Idempotency-Key, price check against the confirmed total), order / status / description from the stored snapshot | Done |
-| M11 | Update and cancel while Not Started, kitchen advance, the cancel-vs-kitchen race | Next |
-| M12-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Planned |
+| M11 | Update (If-Match) and cancel while Not Started, kitchen advance, and race-proof status changes (cancel vs kitchen start: exactly one wins) | Done |
+| M12-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Next |
 | M15F | Fantasy realm test database: invented zones, restaurants, tiered taxes 0-75%, a MYTHIC topping tier, themed crusts and sauces | Planned |
 | M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
 
@@ -84,7 +84,7 @@ And in `tests/PizzaMagic.OrderManager.Tests` (each test builds a real SQLite dat
 
 | Folder | Covers |
 |---|---|
-| `Api` | The menu, quote and order endpoints over HTTP against a real database: prices to the cent, promo outcomes, field errors by path, idempotent submission (including 50 parallel retries with one key), quote = submitted = stored total for every spec example, and orders unchanged by later price, tax or promo edits |
+| `Api` | The menu, quote and order endpoints over HTTP against a real database: prices to the cent, promo outcomes, field errors by path, idempotent submission (including 50 parallel retries with one key), quote = submitted = stored total for every spec example, orders unchanged by later price, tax or promo edits, update/cancel/kitchen rules and their check order, and cancel-vs-kitchen and edit-vs-kitchen races |
 | `Persistence` | All 33 tables and their CHECK / foreign-key rules, the seed matching the spec, the spec examples priced from the database, the seed-script runner, startup validation, UTC and local time columns, and the time zone seed matching tzdb |
 
 ## Run the apps
@@ -114,7 +114,17 @@ curl http://localhost:5100/api/v1/menu
 curl -X POST http://localhost:5100/api/v1/quotes -H 'Content-Type: application/json' -d '{"lineItems":[{"kind":"Pizza","sizeCode":"LARGE","quantity":2,"toppings":[{"code":"PEPPERONI"},{"code":"BACON"}]}],"promoCodes":["ILOVEPIZZA"],"tip":{"mode":"Percent","value":"15"}}'
 ```
 
-The quote returns every intermediate value (line prices, discounts and where they landed, tax lines, tip, total), a written description, the order as the server will accept it (`normalizedDraft`) and whether it can be submitted (`canSubmit`). Promo code problems never fail a quote: each code gets its own status (Applied, NotEligible, Rejected, InvalidFormat, ...). Field errors return 422 with a message per JSON path. To place an order, POST the same draft to `/api/v1/orders` with an `Idempotency-Key` header and `expectedTotalCents` set to the quoted total: a retry with the same key returns the same order (`Idempotent-Replayed: true`), and a total that no longer matches returns 409 with the current quote. More examples, including a conflicting promo code, a dollar tip with its effective percentage, field errors and order submission, are in `PizzaMagic.OrderManager.http`, which Visual Studio and VS Code (REST Client) can run directly.
+The quote returns every intermediate value (line prices, discounts and where they landed, tax lines, tip, total), a written description, the order as the server will accept it (`normalizedDraft`) and whether it can be submitted (`canSubmit`). Promo code problems never fail a quote: each code gets its own status (Applied, NotEligible, Rejected, InvalidFormat, ...). Field errors return 422 with a message per JSON path. To place an order, POST the same draft to `/api/v1/orders` with an `Idempotency-Key` header and `expectedTotalCents` set to the quoted total: a retry with the same key returns the same order (`Idempotent-Replayed: true`), and a total that no longer matches returns 409 with the current quote. Once placed, an order can be changed with `PUT /api/v1/orders/{id}` (header `If-Match: "<version>"`) or cancelled with `POST /api/v1/orders/{id}/cancel`, but only while it is Not Started.
+
+**Simulating the restaurant.** The kitchen moves an order forward one step at a time with
+
+```bash
+curl -X POST http://localhost:5100/api/v1/kitchen/orders/<orderId>/advance -H 'Content-Type: application/json' -d '{"expectedStatus":"NotStarted"}'
+```
+
+(`NotStarted` -> `Started` -> `ReadyForPickup` -> `Delivered`; send the status you expect the order to be in). Repeating the same call is safe: it returns `alreadyApplied: true` instead of advancing twice. Once the kitchen has started an order, update and cancel return 409 with the time it started. If a cancel and a kitchen start arrive at the same moment, exactly one wins (tested 50 times in a row). A timer-driven simulator is designed but not built (plan M18).
+
+More examples, including a conflicting promo code, a dollar tip with its effective percentage, field errors and order submission, are in `PizzaMagic.OrderManager.http`, which Visual Studio and VS Code (REST Client) can run directly.
 
 ## Repository layout
 

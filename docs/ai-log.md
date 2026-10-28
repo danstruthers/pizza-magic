@@ -88,3 +88,12 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 **Verified rather than trusted:**
 - Disabling both the re-check inside the IMMEDIATE transaction and the primary-key backstop makes `Fifty_parallel_submissions_with_one_key_create_one_order` fail, while the sequential replay test still passes. The race test therefore really exercises the in-lock guard. Both guards were restored, and a search confirms no `false &&` remains.
 - On the running service: submit returned 201 with ETag and Location, a retry with the same key returned the same order with `Idempotent-Replayed: true`, status showed the local PDT time, the description came from the snapshot, and a stale total returned 409.
+
+## 2026-10-28: M11 update, cancel, kitchen, races
+
+**Verified rather than trusted:**
+- Removing the status check from cancel's conditional UPDATE (so a cancel overrides a started order) makes exactly three tests fail: both cancel-vs-start race tests (service level and HTTP) and `Cancel_when_started_is_409_and_the_row_is_unchanged`. The condition was then restored.
+- `Naive_check_then_act_double_succeeds` demonstrates the bug the conditional UPDATE prevents: a read-then-write cancel and start both report success.
+- Live run on the service: update returned 200 with ETag "2"; kitchen advance moved the order to Started (v3); cancel then returned 409 "The kitchen has started this order; it can no longer be cancelled."
+
+**Refactor:** M10's submit-only result type became one `OrderResult` with a single outcome-to-HTTP mapping (`OrderResults.ToHttp`) shared by submit, update, cancel and advance.

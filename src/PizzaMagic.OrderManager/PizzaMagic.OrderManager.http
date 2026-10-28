@@ -83,3 +83,26 @@ Idempotency-Key: try-it-2
   "tip": { "mode": "Percent", "value": "15" },
   "expectedTotalCents": 3100
 }
+
+### Update while Not Started (If-Match = current version; P29w: 1 pizza -> $15.74, ETag "2")
+PUT {{PizzaMagic.OrderManager_HostAddress}}/api/v1/orders/{{submit.response.body.$.orderId}}
+Content-Type: application/json
+If-Match: "1"
+Idempotency-Key: try-it-update-1
+
+{
+  "lineItems": [ { "kind": "Pizza", "sizeCode": "LARGE", "quantity": 1,
+                   "toppings": [ { "code": "PEPPERONI" }, { "code": "BACON" } ] } ],
+  "promoCodes": [ "ILOVEPIZZA" ],
+  "tip": { "mode": "Percent", "value": "15" },
+  "expectedTotalCents": 1574
+}
+
+### Kitchen: advance one step (NotStarted -> Started -> ReadyForPickup -> Delivered); repeat = alreadyApplied
+POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/kitchen/orders/{{submit.response.body.$.orderId}}/advance
+Content-Type: application/json
+
+{ "expectedStatus": "NotStarted" }
+
+### Cancel (only while Not Started; after the kitchen starts: 409 order-not-cancellable)
+POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/orders/{{submit.response.body.$.orderId}}/cancel
