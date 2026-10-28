@@ -55,3 +55,6 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Take-home specification (not part of the repository)
+Senior_Software_Developer_*.docx

@@ -1,6 +1,3 @@
 @PizzaMagic.OrderManager_HostAddress = http://localhost:5146
 
-GET {{PizzaMagic.OrderManager_HostAddress}}/weatherforecast/
-Accept: application/json
-
 ###
