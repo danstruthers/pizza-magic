@@ -13,7 +13,7 @@ The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](
 
 ## Current status
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M11**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder screens come in M12-M14.
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M12**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder's client for the order service is in place (M12); its screens come in M13-M14.
 
 | Milestone | What it adds | Status |
 |---|---|---|
@@ -29,7 +29,8 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 | M9 | API: `GET /api/v1/menu` and `POST /api/v1/quotes` (live pricing with validation errors by field) | Done |
 | M10 | Order API: idempotent submit (Idempotency-Key, price check against the confirmed total), order / status / description from the stored snapshot | Done |
 | M11 | Update (If-Match) and cancel while Not Started, kitchen advance, and race-proof status changes (cancel vs kitchen start: exactly one wins) | Done |
-| M12-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Next |
+| M12 | The order builder's typed client for the order service: safe retries (same Idempotency-Key and body), no retry on 4xx, problems parsed, outages reported instead of thrown | Done |
+| M13-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Next |
 | M15F | Fantasy realm test database: invented zones, restaurants, tiered taxes 0-75%, a MYTHIC topping tier, themed crusts and sauces | Planned |
 | M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
 
@@ -86,6 +87,12 @@ And in `tests/PizzaMagic.OrderManager.Tests` (each test builds a real SQLite dat
 |---|---|
 | `Api` | The menu, quote and order endpoints over HTTP against a real database: prices to the cent, promo outcomes, field errors by path, idempotent submission (including 50 parallel retries with one key), quote = submitted = stored total for every spec example, orders unchanged by later price, tax or promo edits, update/cancel/kitchen rules and their check order, and cancel-vs-kitchen and edit-vs-kitchen races |
 | `Persistence` | All 33 tables and their CHECK / foreign-key rules, the seed matching the spec, the spec examples priced from the database, the seed-script runner, startup validation, UTC and local time columns, and the time zone seed matching tzdb |
+
+And in `tests/PizzaMagic.Web.Tests`:
+
+| Folder | Covers |
+|---|---|
+| `Clients` | The order builder's client behind its real retry pipeline: a 503 is retried with the same key and identical body, 4xx is never retried, problem types and fields are parsed, and outages come back as "unavailable" instead of exceptions |
 
 ## Run the apps
 

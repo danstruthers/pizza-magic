@@ -1,7 +1,10 @@
+using PizzaMagic.Web.Clients;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllersWithViews();
+// The only way to the order service (plan section 6.5); the order builder never touches the database.
+builder.Services.AddOrderManagerClient(builder.Configuration);
 
 var app = builder.Build();
 

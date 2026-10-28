@@ -97,3 +97,7 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - Live run on the service: update returned 200 with ETag "2"; kitchen advance moved the order to Started (v3); cancel then returned 409 "The kitchen has started this order; it can no longer be cancelled."
 
 **Refactor:** M10's submit-only result type became one `OrderResult` with a single outcome-to-HTTP mapping (`OrderResults.ToHttp`) shared by submit, update, cancel and advance.
+
+## 2026-10-28: M12 typed client
+
+**Verified rather than trusted:** `Submit_retry_reuses_key_and_body` goes through the real `AddStandardResilienceHandler` pipeline with a stub as the network. It records three requests with one key and identical body bytes, so POST retries really happen (they are not silently disabled) and really are byte-identical. A scan confirms that `PizzaMagic.Web` references no Domain, EF Core or SQLite code.
