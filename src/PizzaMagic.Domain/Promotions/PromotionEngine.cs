@@ -17,10 +17,21 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
     public PromotionResult Evaluate(PromotionCatalog catalog, IReadOnlyList<string> enteredCodes, PromotionContext context)
     {
         var normalized = CodeNormalizer.Normalize(enteredCodes, catalog, context.MaxPromoCodes);
-        var promotions = catalog.Promotions.ToDictionary(p => p.Id);
         var outcomes = new CodeOutcome[normalized.Count];
 
-        // Steps 1-2: drop malformed, duplicate and over-limit codes, then apply the row-level gates.
+        var passed = ApplyGates(normalized, catalog, context, outcomes);
+        var held = ResolveConflicts(passed, catalog, outcomes);
+        var eligible = CheckEligibility(held, context, outcomes);
+        var totalDiscount = ApplyEffects(eligible, context.GrossSubtotal, outcomes);
+
+        return new PromotionResult(outcomes, totalDiscount, held.Select(c => c.Code.Code!).ToList());
+    }
+
+    /// <summary>Steps 1-2: drop malformed, duplicate and over-limit codes, then apply the row-level gates.</summary>
+    private List<Candidate> ApplyGates(
+        IReadOnlyList<NormalizedCode> normalized, PromotionCatalog catalog, PromotionContext context, CodeOutcome[] outcomes)
+    {
+        var promotions = catalog.Promotions.ToDictionary(p => p.Id);
         var passed = new List<Candidate>();
         for (var i = 0; i < normalized.Count; i++)
         {
@@ -39,8 +50,12 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
             }
             passed.Add(new Candidate(i, code, promotion!, parsed!));
         }
+        return passed;
+    }
 
-        // Step 3: conflicts. Rejected codes are never evaluated further.
+    /// <summary>Step 3: conflicts. Rejected codes are never evaluated further.</summary>
+    private List<Candidate> ResolveConflicts(List<Candidate> passed, PromotionCatalog catalog, CodeOutcome[] outcomes)
+    {
         var decisions = conflictPolicy.Resolve(passed.Select(c => new ConflictCandidate(c.Code.Code!, c.Promotion)).ToList(), catalog);
         var held = new List<Candidate>();
         for (var i = 0; i < passed.Count; i++)
@@ -56,8 +71,12 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
             var message = PromoMessage.Plain($"{code} can't be combined with {Join(blockers, "or")}. Remove {Join(blockers, "and")} to use {code}.");
             outcomes[candidate.Index] = Outcome(candidate.Code, PromoStatus.Rejected, message, candidate.Promotion.Id) with { ConflictsWith = blockers };
         }
+        return held;
+    }
 
-        // Step 4: eligibility. Every failing condition is reported.
+    /// <summary>Step 4: eligibility. Every failing condition is reported.</summary>
+    private static List<Candidate> CheckEligibility(List<Candidate> held, PromotionContext context, CodeOutcome[] outcomes)
+    {
         var eligible = new List<Candidate>();
         foreach (var candidate in held)
         {
@@ -73,9 +92,13 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
             }
             eligible.Add(candidate);
         }
+        return eligible;
+    }
 
-        // Step 5: effects, lower priority first, each on what remains.
-        var remaining = context.GrossSubtotal;
+    /// <summary>Step 5: effects, lower priority first, each on what remains. Returns the total discount.</summary>
+    private static Money ApplyEffects(List<Candidate> eligible, Money grossSubtotal, CodeOutcome[] outcomes)
+    {
+        var remaining = grossSubtotal;
         foreach (var candidate in eligible.OrderBy(c => c.Promotion.Priority).ThenBy(c => c.Promotion.Id))
         {
             var code = candidate.Code.Code!;
@@ -95,11 +118,7 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
             var applied = new PromoMessage($"{code} saves {{discount}}.", new Dictionary<string, long> { ["discount"] = discount.Cents });
             outcomes[candidate.Index] = Outcome(candidate.Code, PromoStatus.Applied, applied, candidate.Promotion.Id) with { Discount = discount };
         }
-
-        return new PromotionResult(
-            outcomes,
-            context.GrossSubtotal - remaining,
-            held.Select(c => c.Code.Code!).ToList());
+        return grossSubtotal - remaining;
     }
 
     /// <summary>Row-level gates (step 2). Returns a terminal status, or the promotion and its parsed kinds.</summary>
