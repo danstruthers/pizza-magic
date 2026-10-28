@@ -18,16 +18,44 @@ public enum OrderActor
     Simulator,
 }
 
-/// <summary>The order lifecycle (plan section 2.10). Pure and table-driven.</summary>
+/// <summary>
+/// The order lifecycle (plan section 2.10). Pure and table-driven: the kitchen (or the simulator) moves an order
+/// forward one step at a time, and only the customer cancels, only while the order is NotStarted. There is no
+/// other transition; content edits are not transitions and are allowed only while NotStarted.
+/// </summary>
 public static class OrderStateMachine
 {
-    public static bool CanTransition(OrderStatus from, OrderStatus to, OrderActor actor) => throw new NotImplementedException();
+    private static readonly Dictionary<OrderStatus, OrderStatus> KitchenSteps = new()
+    {
+        [OrderStatus.NotStarted] = OrderStatus.Started,
+        [OrderStatus.Started] = OrderStatus.ReadyForPickup,
+        [OrderStatus.ReadyForPickup] = OrderStatus.Delivered,
+    };
 
-    public static OrderStatus? NextKitchenStatus(OrderStatus from) => throw new NotImplementedException();
+    private static readonly Dictionary<OrderStatus, string> DisplayNames = new()
+    {
+        [OrderStatus.NotStarted] = "Not Started",
+        [OrderStatus.Started] = "Started",
+        [OrderStatus.ReadyForPickup] = "Ready for Pickup",
+        [OrderStatus.Delivered] = "Delivered",
+        [OrderStatus.Cancelled] = "Cancelled",
+    };
 
-    public static bool IsCustomerModifiable(OrderStatus status) => throw new NotImplementedException();
+    public static bool CanTransition(OrderStatus from, OrderStatus to, OrderActor actor) => actor switch
+    {
+        OrderActor.Kitchen or OrderActor.Simulator => NextKitchenStatus(from) == to,
+        OrderActor.Customer => from == OrderStatus.NotStarted && to == OrderStatus.Cancelled,
+        _ => false,
+    };
 
-    public static bool IsTerminal(OrderStatus status) => throw new NotImplementedException();
+    /// <summary>The kitchen's next status, or null when the order cannot move forward (Delivered, Cancelled).</summary>
+    public static OrderStatus? NextKitchenStatus(OrderStatus from) =>
+        KitchenSteps.TryGetValue(from, out var next) ? next : null;
 
-    public static string DisplayName(OrderStatus status) => throw new NotImplementedException();
+    /// <summary>The customer may update or cancel only while the kitchen has not started the order.</summary>
+    public static bool IsCustomerModifiable(OrderStatus status) => status == OrderStatus.NotStarted;
+
+    public static bool IsTerminal(OrderStatus status) => status is OrderStatus.Delivered or OrderStatus.Cancelled;
+
+    public static string DisplayName(OrderStatus status) => DisplayNames[status];
 }
