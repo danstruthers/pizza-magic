@@ -152,3 +152,16 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - The README's data-only example (a PARTY size and a BIGTEN promo conflicting with both codes) was run as a seed script on a scratch database: Pepperoni on a Party priced at $1.44, 3 Party Pepperoni with BIGTEN totalled $51.46, SAVE5 was rejected with the conflict message, and below $50 BIGTEN explained why. The script and database were deleted afterwards.
 - Every API example in the README was run verbatim on a fresh database: the quote returned 3148; the same submit twice returned 201 then a replay (`Idempotent-Replayed: true`, same id); the update returned 200 with ETag "2"; cancel returned 200 Cancelled twice; the conflict message matched; the description endpoint returned 200.
 - The conditional `UPDATE` predicates quoted in the write-up were checked against `OrderService` (cancel: `status = NotStarted`; kitchen: `status = expected`).
+
+## 2026-10-28: UQ29 UI fixes (extra toppings, promo list, Review button)
+
+**Found by using the app, not by the tests:** three UI problems reported by the user. The page had no way to ask for 2x/3x of a topping (the server refused multipliers by design, A69); the promo chips worked but showed what each code did only in a hover tooltip, with a tiny × to remove it and no per-code discount line; and Review was a link styled as disabled, so it could be reached by keyboard, and stayed enabled for the debounce window after an edit (e.g. right after removing the last pizza).
+
+**Diagnosed rather than guessed:** before changing anything, the builder was driven in headless Edge over the DevTools protocol (a small Node script, no packages): the promo chip did render and Remove did work, so the promo fix is visibility; the Review link had `pointer-events: none` but `tabIndex 0`.
+
+**Fixed AI output:**
+- A test regex used `"s"` in a regular C# string (an invalid escape) and was rewritten as a verbatim string.
+- The browser-check script passed `
+` inside a template literal into the page, where it became a real line break inside a regex literal; it was rewritten with `String.fromCharCode(10)`.
+
+**Verified rather than trusted:** red first (11 Domain, 5 OrderManager, 3 Web and 2 JS tests failing for the right reason), then green; the stored row satisfies the schema's `placement_charge_cents = placement_unit_charge_cents * multiplier` CHECK; and in headless Edge: Review disabled and unfocusable on an empty page, immediately after an edit and after removing the last pizza; Large Pepperoni 3x = $15.85 (1488 + 97); ILOVEPIZZA listed with "saves $1.49", a Remove button and its own discount line, total $14.26; SAVE5 shows the conflict message; Remove restores $15.85; Medium Pepperoni 2x reviews and places at $8.65 and the order page says "Pepperoni 2x"; `/Checkout` with an empty cart lands on the builder; no console errors.

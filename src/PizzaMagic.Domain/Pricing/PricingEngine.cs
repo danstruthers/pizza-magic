@@ -98,7 +98,8 @@ public sealed class PricingEngine(PromotionEngine promotions)
         line.Quantity,
         line.Toppings.Select(t => DraftValidator.Canonical(t.Code)).ToList(),
         line.CrustCode is null ? null : DraftValidator.Canonical(line.CrustCode),
-        line.SauceCode is null ? null : DraftValidator.Canonical(line.SauceCode));
+        line.SauceCode is null ? null : DraftValidator.Canonical(line.SauceCode),
+        line.Toppings.ToDictionary(t => DraftValidator.Canonical(t.Code), t => t.Multiplier ?? 1));
 
     /// <summary>The line as the server accepts it: canonical codes, explicit crust and sauce, toppings in display order.</summary>
     private static PizzaDraftLine Normalize(PricedPizzaLine line) => new(
@@ -106,7 +107,7 @@ public sealed class PricingEngine(PromotionEngine promotions)
         line.Quantity,
         line.Components
             .Where(c => c.Kind == ComponentKind.Topping)
-            .Select(c => new DraftTopping(c.Product.Code, DraftValidator.WholePortionCode, 1))
+            .Select(c => new DraftTopping(c.Product.Code, DraftValidator.WholePortionCode, c.Multiplier))
             .ToList(),
         line.Crust.Code,
         line.Sauce.Code);

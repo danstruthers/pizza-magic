@@ -36,12 +36,12 @@ public static class ResponseMapper
                 tierCodes[c.Product.ToppingTierId!.Value],
                 DraftValidator.WholePortionCode,
                 WholeLabel,
-                1,
+                c.Multiplier,
                 GlobalTierSource,
-                c.UnitCharge.Cents,
+                c.ToppingPrice!.UnitPrice.Cents,
                 Domain.Monetary.Rate.MaxPpm,
-                c.UnitCharge.Cents,
-                c.UnitCharge.Cents)).ToList(),
+                c.ToppingPrice.UnitPrice.Cents,   // whole coverage: the placement unit charge is the topping unit price
+                c.UnitCharge.Cents)).ToList(),    // x multiplier (UQ29)
             l.Line.UnitPrice.Cents,
             l.Line.LineTotal.Cents,
             breakdown.Allocations.Where(a => a.LineNumber == l.LineNumber).Sum(a => a.Amount.Cents),
@@ -125,7 +125,8 @@ public static class ResponseMapper
                     size => (IReadOnlyDictionary<string, long>)new Dictionary<string, long>
                     {
                         [DraftValidator.WholePortionCode] = menu.ToppingUnitPrice(topping, size.Price!.Value).UnitPrice.Cents,
-                    }))).ToList())).ToList();
+                    }),
+                topping.MaxMultiplier ?? 1)).ToList())).ToList();
 
         var policy = catalog.Policy;
         return new MenuResponse(

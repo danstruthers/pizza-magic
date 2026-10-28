@@ -87,9 +87,9 @@ export function reduceQuote({ status, body }) {
 
   for (const promo of body.promotions ?? []) {
     if (promo.status === 'Applied') {
-      view.chips.push({ code: promo.code, state: 'applied', message: promo.message });
+      view.chips.push({ code: promo.code, state: 'applied', message: promo.message, discountText: formatCents(-promo.discountCents) });
     } else if (promo.status === 'NotEligible') {
-      view.chips.push({ code: promo.code, state: 'warning', message: promo.message });
+      view.chips.push({ code: promo.code, state: 'warning', message: promo.message, discountText: null });
     } else if (promo.status !== 'Duplicate' && promo.message) {
       view.notices.push(promo.message);   // removed from the cart: Rejected, InvalidFormat, Unknown, ...
     }

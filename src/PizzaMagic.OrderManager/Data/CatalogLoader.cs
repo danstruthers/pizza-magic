@@ -99,7 +99,7 @@ public sealed class CatalogLoader(PizzaMagicDbContext db, PricingMethodRegistry?
     }
 
     internal static ProductRow ToRow(ProductEntity p) => new(
-        p.Id, ToProductType(p.ProductTypeCode), p.Code, p.DisplayName, p.PriceCents, p.ToppingTierId, p.CategoryId, p.TaxClassId, p.IsDefault, p.SortOrder, p.IsActive);
+        p.Id, ToProductType(p.ProductTypeCode), p.Code, p.DisplayName, p.PriceCents, p.ToppingTierId, p.CategoryId, p.TaxClassId, p.IsDefault, p.SortOrder, p.IsActive, p.MaxMultiplier);
 
     internal static ProductType ToProductType(string code) => code switch
     {

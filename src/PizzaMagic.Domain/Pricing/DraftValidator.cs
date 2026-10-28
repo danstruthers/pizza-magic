@@ -50,12 +50,25 @@ public static class DraftValidator
                 var toppingPath = $"{path}.toppings[{j}]";
                 CheckProduct(menu, topping.Code, ProductType.Topping, $"{toppingPath}.code", "a topping", errors);
 
-                var isWholeOnce = (topping.Portion is null || Canonical(topping.Portion) == WholePortionCode)
-                    && (topping.Multiplier is null or 1);
-                if (!isWholeOnce || !seen.Add(Canonical(topping.Code)))
+                // Built scope (A69, UQ29): the whole pizza only, each topping listed once, 1x..max_multiplier times.
+                var code = Canonical(topping.Code);
+                var found = menu.Lookup(code, ProductType.Topping, out var product) == ProductLookup.Available;
+                var name = found ? product!.DisplayName : topping.Code;
+                if (topping.Portion is not null && Canonical(topping.Portion) != WholePortionCode)
                 {
                     errors.Add(new FieldError(toppingPath, "PLACEMENT_NOT_SUPPORTED",
-                        "Half, quarter and extra toppings are designed but not built in this version."));
+                        "Half and quarter toppings are designed but not built in this version."));
+                }
+                else if (!seen.Add(code))
+                {
+                    errors.Add(new FieldError(toppingPath, "DUPLICATE_TOPPING",
+                        $"{name} is already on this pizza. To add more, change its amount (2x, 3x) instead."));
+                }
+                else if (found && topping.Multiplier is { } multiplier && (multiplier < 1 || multiplier > (product!.MaxMultiplier ?? 1)))
+                {
+                    var max = product!.MaxMultiplier ?? 1;
+                    errors.Add(new FieldError($"{toppingPath}.multiplier", "MULTIPLIER_OUT_OF_RANGE",
+                        max == 1 ? $"{name} can be added at most once." : $"{name} can be added at most {max} times."));
                 }
             }
         }

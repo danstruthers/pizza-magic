@@ -21,4 +21,13 @@ public sealed record BuilderViewModel(MenuResponse? Menu, CartState Cart)
         JsonSerializer.Serialize(topping.Prices.ToDictionary(p => p.Key, p => p.Value.TryGetValue("WHOLE", out var cents) ? cents : 0), Json);
 
     public static string Percent(int ppm) => PercentFormatter.FormatBasisPointsCompact(ppm / 100);
+
+    /// <summary>The topping amount choices (UQ29): Regular, Extra (2x), Triple (3x), then "4x"...</summary>
+    public static string Amount(int multiplier) => multiplier switch
+    {
+        1 => "Regular",
+        2 => "Extra (2x)",
+        3 => "Triple (3x)",
+        _ => $"{multiplier}x",
+    };
 }

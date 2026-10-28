@@ -43,7 +43,7 @@ The build treats warnings as errors. To list the spec's worked pricing examples 
 
 ## Using it
 
-1. Open http://localhost:5000. Add pizzas (size, quantity, whole toppings), promo codes and a tip (preset %, custom % or dollars). The total updates as you go; "Describe my order" shows the written description.
+1. Open http://localhost:5000. Add pizzas (size, quantity, toppings, each as Regular, Extra 2x or Triple 3x), promo codes and a tip (preset %, custom % or dollars). The total updates as you go; each promo code is listed with what it saves (or why it doesn't apply yet) and a Remove button, and "Describe my order" shows the written description. Review stays disabled until the current total allows the order to be placed.
 2. **Review order** prices the order again and shows exactly what will be charged. **Place order** sends it and opens the order's page (save the link; "Your orders" also lists it).
 3. While the order is Not Started, **Change order** (back through the builder and Review) and **Cancel order** are available. The page polls the status every 5 seconds.
 4. **Simulate the kitchen** (the restaurant side): advance an order one step at a time, sending the status you expect it to be in:
@@ -124,7 +124,7 @@ Every place the rules were open, and what was decided. The full table (A1–A74,
 
 **Scope**
 - One restaurant is seeded, though the schema supports several (global menu plus per-store overrides). Prices are USD.
-- Whole toppings only. Half, quarter and extra toppings, crust/sauce upgrades and add-ons are designed, not built, and the API refuses them with a clear message. The default crust (hand tossed) and sauce (classic tomato) are free.
+- Toppings cover the whole pizza, once each, as Regular, Extra (2x) or Triple (3x) (up to each topping's max, from the menu data). Extra is charged per layer: the rounded topping price × 2 or × 3, then × quantity (Large Pepperoni 2x = 2 × $0.96), and described as "Pepperoni 2x". Half and quarter toppings, crust/sauce upgrades and add-ons are designed, not built, and the API refuses them with a clear message. The default crust (hand tossed) and sauce (classic tomato) are free.
 - The cart lives in an in-memory session (2 hours idle): fine for one server, lost on restart.
 
 ## Design write-up
@@ -168,7 +168,7 @@ A new *kind* of rule (say "2+ pizzas") is one new `IConditionEvaluator` class re
 
 I checked that the important tests can fail by temporarily breaking the code (banker's rounding, swapped tax methods, a cancel without the status condition, a missing idempotency guard, a stray `Math.Round`). Each break failed the expected tests, and was then reverted. The log is in `docs/ai-log.md`.
 
-**Not covered:** the browser DOM wiring (`order-builder.js`, `order-details.js`) has no automated browser test (its logic modules do have `node --test` tests, and it was exercised by hand). There is nothing for multi-process deployment (the database's unique key is the backstop there, but untested across processes), load, session scale-out, or accessibility. The designed-not-built features have test vectors written in the plan but no tests. The planned "fantasy realm" test database (M15F) is not built.
+**Not covered:** the browser DOM wiring (`order-builder.js`, `order-details.js`) has no automated browser test in the suite. Its logic modules have `node --test` tests, and the builder was driven end to end in headless Edge with a scripted session (add a pizza, extra toppings, apply and remove promos, Review enabling, review and place), but that script is not part of `dotnet test`. There is nothing for multi-process deployment (the database's unique key is the backstop there, but untested across processes), load, session scale-out, or accessibility. The designed-not-built features have test vectors written in the plan but no tests. The planned "fantasy realm" test database (M15F) is not built.
 
 Test projects: `tests/PizzaMagic.Domain.Tests` (pricing core), `tests/PizzaMagic.OrderManager.Tests` (API and persistence against a real temp-file SQLite), `tests/PizzaMagic.Web.Tests` (order builder with a scripted order service), `tests/PizzaMagic.EndToEnd.Tests` (both real apps in-process, plus the architecture rules) and `tests/js` (`node --test`).
 

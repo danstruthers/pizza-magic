@@ -46,7 +46,8 @@ public static class EffectiveMenuBuilder
                 restaurantPrice is null ? PriceSource.Global : PriceSource.Restaurant,
                 product.TaxClassId,
                 product.ToppingTierId,
-                product.SortOrder));
+                product.SortOrder,
+                product.MaxMultiplier));
         }
 
         var globalDefaults = catalog.Products.Where(p => p.IsDefault).Select(p => p.Id).ToHashSet();

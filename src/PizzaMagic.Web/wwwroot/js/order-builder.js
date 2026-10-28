@@ -19,7 +19,7 @@ if (root) {
     lines: (saved.lineItems ?? []).map((l) => ({
       sizeCode: l.sizeCode,
       quantity: l.quantity,
-      toppings: (l.toppings ?? []).map((t) => t.code),
+      toppings: (l.toppings ?? []).map((t) => ({ code: t.code, multiplier: t.multiplier ?? 1 })),
       crustCode: l.crustCode ?? null,   // kept from an order being changed; the builder has no crust/sauce picker yet (X2)
       sauceCode: l.sauceCode ?? null,
     })),
@@ -42,7 +42,10 @@ if (root) {
     onResponse: (response) => render(reduceQuote(response)),
     onBusyChange: (busy) => {
       totalPanel.classList.toggle('opacity-50', busy);
-      if (busy) statusEl.textContent = 'updating…';
+      if (busy) {
+        statusEl.textContent = 'updating…';
+        reviewEl.disabled = true;   // the shown total is out of date until the next quote says otherwise
+      }
     },
   });
 
@@ -53,7 +56,7 @@ if (root) {
         kind: 'Pizza',
         sizeCode: l.sizeCode,
         quantity: l.quantity,
-        toppings: l.toppings.map((code) => ({ code })),
+        toppings: l.toppings.map((t) => ({ code: t.code, multiplier: t.multiplier })),
         crustCode: l.crustCode,
         sauceCode: l.sauceCode,
       })),
@@ -81,9 +84,23 @@ if (root) {
       quantity.value = line.quantity;
       quantity.addEventListener('change', () => { line.quantity = Number.parseInt(quantity.value, 10) || 0; changed(); });
       node.querySelectorAll('.topping').forEach((box) => {
-        box.checked = line.toppings.includes(box.value);
+        // The amount choice (Regular / Extra 2x / Triple 3x), when the topping allows more than one (UQ29).
+        const amount = node.querySelector(`.multiplier[data-for="${box.value}"]`);
+        const chosen = line.toppings.find((t) => t.code === box.value);
+        box.checked = chosen !== undefined;
+        if (amount) {
+          amount.value = String(chosen?.multiplier ?? 1);
+          amount.disabled = !box.checked;
+          amount.addEventListener('change', () => {
+            const topping = line.toppings.find((t) => t.code === box.value);
+            if (topping) { topping.multiplier = Number.parseInt(amount.value, 10); changed(); }
+          });
+        }
         box.addEventListener('change', () => {
-          line.toppings = box.checked ? [...line.toppings, box.value] : line.toppings.filter((c) => c !== box.value);
+          line.toppings = box.checked
+            ? [...line.toppings, { code: box.value, multiplier: amount ? Number.parseInt(amount.value, 10) : 1 }]
+            : line.toppings.filter((t) => t.code !== box.value);
+          if (amount) amount.disabled = !box.checked;
           changed();
         });
       });
@@ -125,25 +142,51 @@ if (root) {
   document.getElementById('promo-apply').addEventListener('click', applyPromo);
   promoInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyPromo(); } });
 
+  // Every held code is listed with what it does (or why it doesn't apply yet) and a Remove button; each applied
+  // code also gets its own line under Discounts, so the customer can see which discount is which.
   function renderChips(view) {
+    const removeCode = (code) => {
+      state.promoCodes = state.promoCodes.filter((c) => c.trim().toUpperCase() !== code);
+      changed();
+    };
     const chips = document.getElementById('promo-chips');
-    chips.replaceChildren(...view.chips.map((chip) => {
-      const el = document.createElement('span');
-      el.className = `badge rounded-pill ${chip.state === 'applied' ? 'text-bg-success' : 'text-bg-warning'}`;
-      el.title = chip.message ?? '';
-      el.textContent = `${chip.code} `;
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn-close btn-close-white ms-1';
-      remove.style.fontSize = '0.6rem';
-      remove.setAttribute('aria-label', `Remove ${chip.code}`);
-      remove.addEventListener('click', () => {
-        state.promoCodes = state.promoCodes.filter((c) => c.toUpperCase() !== chip.code);
-        changed();
-      });
-      el.append(remove);
-      return el;
-    }));
+    if (view.chips.length === 0) {
+      const none = document.createElement('li');
+      none.className = 'small text-muted';
+      none.textContent = 'No promo codes applied.';
+      chips.replaceChildren(none);
+    } else {
+      chips.replaceChildren(...view.chips.map((chip) => {
+        const item = document.createElement('li');
+        item.className = 'd-flex flex-wrap align-items-center gap-2 py-1';
+        const badge = document.createElement('span');
+        badge.className = `badge ${chip.state === 'applied' ? 'text-bg-success' : 'text-bg-warning'}`;
+        badge.textContent = chip.state === 'applied' ? `${chip.code} ✓` : `${chip.code} – not applied`;
+        const message = document.createElement('span');
+        message.className = 'small';
+        message.textContent = chip.message ?? '';
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn btn-sm btn-outline-danger py-0';
+        remove.textContent = 'Remove';
+        remove.setAttribute('aria-label', `Remove promo code ${chip.code}`);
+        remove.addEventListener('click', () => removeCode(chip.code));
+        item.append(badge, message, remove);
+        return item;
+      }));
+    }
+    document.getElementById('discount-lines').replaceChildren(...view.chips
+      .filter((chip) => chip.state === 'applied')
+      .map((chip) => {
+        const row = document.createElement('div');
+        row.className = 'd-flex justify-content-between';
+        const code = document.createElement('span');
+        code.textContent = chip.code;
+        const amount = document.createElement('span');
+        amount.textContent = chip.discountText;
+        row.append(code, amount);
+        return row;
+      }));
     document.getElementById('promo-notices').replaceChildren(...view.notices.map((text) => {
       const div = document.createElement('div');
       div.textContent = text;
@@ -210,9 +253,7 @@ if (root) {
     }
 
     document.getElementById('reasons').textContent = view.reasons.join(' ');
-    reviewEl.classList.toggle('disabled', !view.reviewEnabled);
-    reviewEl.setAttribute('aria-disabled', String(!view.reviewEnabled));
-    if (view.reviewEnabled) reviewEl.removeAttribute('disabled'); else reviewEl.setAttribute('disabled', '');
+    reviewEl.disabled = !view.reviewEnabled;
   }
 
   document.getElementById('describe').addEventListener('click', () => descriptionEl.classList.toggle('d-none'));

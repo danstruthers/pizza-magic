@@ -28,7 +28,7 @@ public sealed record DescriptionSource(
             l.Line.Crust.Code == menu.DefaultCrust?.Code,
             l.Line.Sauce.DisplayName,
             l.Line.Sauce.Code == menu.DefaultSauce?.Code,
-            l.Line.Components.Where(c => c.Kind == ComponentKind.Topping).Select(c => c.Product.DisplayName).ToList(),
+            l.Line.Components.Where(c => c.Kind == ComponentKind.Topping).Select(c => ToppingPhrase.Of(c.Product.DisplayName, c.Multiplier)).ToList(),
             l.Line.LineTotal.Cents)).ToList();
 
         // Entry order, as stored orders list them, so a quote and its order describe promotions identically.

@@ -35,8 +35,12 @@ public static class PizzaLinePricer
             .ThenBy(t => t.Id);
         foreach (var topping in toppings)
         {
+            // The unit price is already whole cents (RP1); extra layers multiply it, never the unrounded rate (UQ29).
             var price = menu.ToppingUnitPrice(topping, basePrice);
-            components.Add(new PricedComponent(ComponentKind.Topping, topping, price.UnitPrice, price.Source, topping.TaxClassId, price));
+            var multiplier = request.ToppingMultipliers?.GetValueOrDefault(topping.Code, 1) ?? 1;
+            ArgumentOutOfRangeException.ThrowIfLessThan(multiplier, 1);
+            components.Add(new PricedComponent(
+                ComponentKind.Topping, topping, price.UnitPrice * multiplier, price.Source, topping.TaxClassId, price, multiplier));
         }
 
         var unitPrice = components.Aggregate(Money.Zero, (sum, c) => sum + c.UnitCharge);

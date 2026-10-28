@@ -42,6 +42,12 @@ public sealed class CheckoutController(
             cart = cart with { PendingTicket = null };   // expired: nothing can be retried with it
         }
 
+        // Nothing to review (a bookmark, a stale page): back to the builder rather than an empty Review page.
+        if (cart.LineItems.Count == 0)
+        {
+            return Redirect("/");
+        }
+
         // The key is reused while the cart's content is unchanged, so reviewing again can't create a second order.
         if (cart.KeyRevision != cart.Revision)
         {
