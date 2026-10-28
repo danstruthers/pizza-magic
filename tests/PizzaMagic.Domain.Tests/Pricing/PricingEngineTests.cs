@@ -300,9 +300,9 @@ public class PricingEngineTests
             .Promotions.Outcomes[1].Status.ShouldBe(PromoStatus.LimitExceeded);
     }
 
-    // P26w / A69: half, quarter and extra toppings are designed but not built.
+    // P26w / A69 as revised by UQ29: half and quarter toppings are designed but not built; extra (2x, 3x) is built.
     [Fact]
-    public void Built_scope_rejects_partial_and_extra_toppings()
+    public void Built_scope_rejects_partial_and_repeated_toppings()
     {
         var line = new PizzaDraftLine("LARGE", 1,
         [
@@ -317,10 +317,9 @@ public class PricingEngineTests
         errors.Select(e => (e.Path, e.Code)).ShouldBe(
         [
             ("lineItems[0].toppings[0]", "PLACEMENT_NOT_SUPPORTED"),
-            ("lineItems[0].toppings[1]", "PLACEMENT_NOT_SUPPORTED"),
-            ("lineItems[0].toppings[3]", "PLACEMENT_NOT_SUPPORTED"),
+            ("lineItems[0].toppings[3]", "DUPLICATE_TOPPING"),
         ]);
-        errors[0].Message.ShouldBe("Half, quarter and extra toppings are designed but not built in this version.");
+        errors[0].Message.ShouldBe("Half and quarter toppings are designed but not built in this version.");
 
         var explicitWhole = Ok(Price(Draft([new PizzaDraftLine("LARGE", 1, [new DraftTopping("PEPPERONI", "WHOLE", 1)])])));
         (explicitWhole.Subtotal.Cents, explicitWhole.Tax.Tax.Cents, explicitWhole.Total.Cents).ShouldBe((1296L, 84L, 1380L));

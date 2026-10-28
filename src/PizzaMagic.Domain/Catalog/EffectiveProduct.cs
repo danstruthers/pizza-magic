@@ -15,4 +15,5 @@ public sealed record EffectiveProduct(
     PriceSource PriceSource,
     long TaxClassId,
     long? ToppingTierId,
-    int SortOrder);
+    int SortOrder,
+    int? MaxMultiplier = null);

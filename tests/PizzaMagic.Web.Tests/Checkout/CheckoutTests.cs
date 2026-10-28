@@ -282,6 +282,20 @@ public class CheckoutTests
         WebFactory.Text(await client.GetStringAsync("/")).ShouldNotContain("We couldn't confirm your order");   // not locked
     }
 
+    // Reaching Review with nothing in the cart (a bookmark, the keyboard, a stale page) goes back to the builder.
+    [Fact]
+    public async Task Review_with_an_empty_cart_returns_to_the_builder()
+    {
+        await using var factory = new WebFactory();
+        var (client, _) = await factory.BrowserAsync();
+
+        var response = await client.GetAsync("/Checkout");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        response.Headers.Location!.OriginalString.ShouldBe("/");
+        factory.OrderManager.QuoteRequests.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Review_says_so_when_the_service_is_unavailable()
     {

@@ -76,7 +76,7 @@ public static class Menus
         [new("CLASSIC_TOMATO", "Classic tomato", 0, true)],
         [],
         [
-            new("BASIC", "Basic", [new("PEPPERONI", "Pepperoni", Grid(("SMALL", 40), ("MEDIUM", 56), ("LARGE", 96)))]),
+            new("BASIC", "Basic", [new("PEPPERONI", "Pepperoni", Grid(("SMALL", 40), ("MEDIUM", 56), ("LARGE", 96)), MaxMultiplier: 3)]),
             new("PREMIUM", "Premium", [new("BACON", "Bacon", Grid(("SMALL", 55), ("MEDIUM", 77), ("LARGE", 132)))]),
         ],
         new MenuPolicyResponse(20, 20, 12, 3, 50_000, 1_000_000, [150_000, 180_000, 200_000]));

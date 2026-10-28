@@ -18,7 +18,8 @@ public sealed record ProductRow(
     long TaxClassId,
     bool IsDefault,
     int SortOrder,
-    bool IsActive = true);
+    bool IsActive = true,
+    int? MaxMultiplier = null);   // toppings: how many times one may go on a pizza (product.max_multiplier)
 
 public sealed record ToppingTierRow(long Id, string Code, string DisplayName, PricingRule Rule, int SortOrder, bool IsActive = true);
 

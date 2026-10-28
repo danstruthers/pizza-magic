@@ -99,8 +99,7 @@ public class QuoteApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         problem.FieldErrors().ShouldBe(
         [
             ("lineItems[0].quantity", "QUANTITY_OUT_OF_RANGE"),
-            ("lineItems[0].toppings[0]", "PLACEMENT_NOT_SUPPORTED"),
-            ("lineItems[0].toppings[1]", "PLACEMENT_NOT_SUPPORTED"),
+            ("lineItems[0].toppings[1]", "PLACEMENT_NOT_SUPPORTED"),   // WHOLE 2x is fine (UQ29); LEFT is not built
             ("tip.value", "TIP_INVALID"),
         ], ignoreOrder: true);
         problem.GetProperty("errors").GetProperty("lineItems[0].quantity")[0].GetProperty("message").GetString()

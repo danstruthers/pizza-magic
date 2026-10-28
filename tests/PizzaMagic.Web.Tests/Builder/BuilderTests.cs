@@ -30,6 +30,32 @@ public class BuilderTests
         html.ShouldContain("Pizza Magic!");
     }
 
+    // UQ29: a topping that may go on more than once gets an amount choice, up to its max from the menu.
+    [Fact]
+    public async Task Builder_offers_extra_amounts_up_to_each_toppings_max()
+    {
+        await using var factory = new WebFactory();
+
+        var html = WebFactory.Text(await factory.CreateClient().GetStringAsync("/"));
+
+        html.ShouldContain("aria-label=\"Pepperoni amount\"");
+        html.ShouldContain("Extra (2x)");
+        html.ShouldContain("Triple (3x)");
+        html.ShouldNotContain("aria-label=\"Bacon amount\"");   // Bacon allows only 1x in this menu
+    }
+
+    // Review is a real button, disabled until a current quote says the order can be placed (keyboard included).
+    [Fact]
+    public async Task Review_is_a_disabled_button_until_a_quote_allows_it()
+    {
+        await using var factory = new WebFactory();
+
+        var html = await factory.CreateClient().GetStringAsync("/");
+
+        System.Text.RegularExpressions.Regex.IsMatch(html, @"<button[^>]*id=""review""[^>]*\sdisabled").ShouldBeTrue();
+        html.ShouldNotContain("<a id=\"review\"");
+    }
+
     [Fact]
     public async Task Builder_says_so_when_the_menu_is_unavailable()
     {

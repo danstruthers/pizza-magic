@@ -99,7 +99,7 @@ test('a not-eligible promo stays as a chip with its reason; Review stays disable
     normalizedPromoCodes: ['SAVE5'],
     promotions: [{ code: 'SAVE5', status: 'NotEligible', discountCents: 0, message: 'SAVE5 requires an order subtotal over $20.00 (yours is $20.00).', conflictsWith: [], allocations: [] }],
   }) });
-  assert.deepEqual(view.chips, [{ code: 'SAVE5', state: 'warning', message: 'SAVE5 requires an order subtotal over $20.00 (yours is $20.00).' }]);
+  assert.deepEqual(view.chips, [{ code: 'SAVE5', state: 'warning', message: 'SAVE5 requires an order subtotal over $20.00 (yours is $20.00).', discountText: null }]);
   assert.equal(view.reviewEnabled, false);
   assert.deepEqual(view.reasons, ['SAVE5 requires an order subtotal over $20.00 (yours is $20.00).']);
 });
@@ -111,7 +111,8 @@ test('a rejected code is removed and its message shown once', () => {
       { code: 'SAVE5', status: 'Rejected', discountCents: 0, message: "SAVE5 can't be combined with ILOVEPIZZA. Remove ILOVEPIZZA to use SAVE5.", conflictsWith: ['ILOVEPIZZA'], allocations: [] },
     ],
   }) });
-  assert.deepEqual(view.chips, [{ code: 'ILOVEPIZZA', state: 'applied', message: 'ILOVEPIZZA saves $2.86.' }]);
+  // The applied code shows what it saved, so the customer can see which discount is which (and remove it).
+  assert.deepEqual(view.chips, [{ code: 'ILOVEPIZZA', state: 'applied', message: 'ILOVEPIZZA saves $2.86.', discountText: '-$2.86' }]);
   assert.deepEqual(view.notices, ["SAVE5 can't be combined with ILOVEPIZZA. Remove ILOVEPIZZA to use SAVE5."]);
   assert.deepEqual(view.promoCodes, ['ILOVEPIZZA']);
 });

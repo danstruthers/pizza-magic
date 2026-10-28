@@ -56,7 +56,7 @@ public static class SeedCatalog
         new(id, ProductType.PizzaSize, code, name, priceCents, null, null, PreparedFood, IsDefault: false, SortOrder: sortOrder);
 
     public static ProductRow Topping(long id, string code, string name, long tier, int sortOrder) =>
-        new(id, ProductType.Topping, code, name, null, tier, null, PreparedFood, IsDefault: false, SortOrder: sortOrder);
+        new(id, ProductType.Topping, code, name, null, tier, null, PreparedFood, IsDefault: false, SortOrder: sortOrder, MaxMultiplier: 3);
 
     public static CatalogSnapshot WithProduct(this CatalogSnapshot snapshot, ProductRow product) =>
         snapshot with { Products = [.. snapshot.Products, product] };

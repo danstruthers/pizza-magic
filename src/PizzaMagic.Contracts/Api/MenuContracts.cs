@@ -23,8 +23,15 @@ public sealed record MenuAddOnCategoryResponse(string Code, string Name);
 
 public sealed record MenuTierResponse(string Code, string Name, IReadOnlyList<MenuToppingResponse> Toppings);
 
-/// <summary>Prices by size code, then portion type code: prices["LARGE"]["WHOLE"] = 96.</summary>
-public sealed record MenuToppingResponse(string Code, string Name, IReadOnlyDictionary<string, IReadOnlyDictionary<string, long>> Prices);
+/// <summary>
+/// A topping. Prices by size code, then portion type code: prices["LARGE"]["WHOLE"] = 96. It may go on one pizza
+/// 1x..<c>MaxMultiplier</c> times (UQ29).
+/// </summary>
+public sealed record MenuToppingResponse(
+    string Code,
+    string Name,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, long>> Prices,
+    int MaxMultiplier = 1);
 
 public sealed record MenuPolicyResponse(
     int MaxLines,
