@@ -1,2 +1,112 @@
-# pizza-magic
-Pizza ordering client-server
+# Pizza Magic!
+
+A pizza order builder with a separate order service. A customer builds an order, watches the total update as they change it, and sends it to the restaurant's order service. They can then check on the order and, until the kitchen starts it, change or cancel it.
+
+| Piece | Project | What it is | URL when running |
+|---|---|---|---|
+| Order builder | `src/PizzaMagic.Web` | ASP.NET Core 8 MVC app for customers (no login) | http://localhost:5000 |
+| Order service | `src/PizzaMagic.OrderManager` | ASP.NET Core 8 Web API; the only process that touches the database (SQLite) | http://localhost:5100 (Swagger at `/swagger`) |
+| Pricing core | `src/PizzaMagic.Domain` | Pure C# library: menu, pricing, promotions, tax, local time | (library) |
+| Wire contract | `src/PizzaMagic.Contracts` | Shared DTOs and the money / percent formatters | (library) |
+
+The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).
+
+## Current status
+
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M5**, which is the whole pricing core. The two apps start and serve their pages, but the HTTP API, the database and the order builder screens come in M8-M14.
+
+| Milestone | What it adds | Status |
+|---|---|---|
+| M0 | Solution, package pins, ports, smoke test | Done |
+| M1 | Money in integer cents, the two named rounding rules, exact splitting, `$` formatting | Done |
+| M2 | Menu with per-restaurant overrides, pizza line pricing, restaurant local time | Done |
+| M3 | Promotion engine: ILOVEPIZZA / SAVE5 as data, conflicts, validity windows | Done |
+| M4 | Tax: Washington 6.5%, rounding method from the jurisdiction's data | Done |
+| M5 | Pricing engine: validation, discounts, tax, tip (with effective %), totals | Done |
+| M6-M7 | Order description, order state machine | Next |
+| M8-M11 | Database, menu/quote/order API, idempotent submit, update/cancel/kitchen | Planned |
+| M12-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Planned |
+| M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
+
+**What you can look at today:**
+- **The pricing core, through its tests.** Every worked example in the plan (for instance P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = **$31.48**) is a test you can run (see below).
+- **The order builder** at http://localhost:5000: the branded welcome page (logo, favicon). The builder screens arrive in M13.
+- **The order service** at http://localhost:5100/swagger: it starts and serves Swagger, with no endpoints yet (M9).
+
+## Prerequisites
+
+- [.NET SDK 8.0.427](https://dotnet.microsoft.com/download/dotnet/8.0) or a later 8.0 feature band (pinned in `global.json`).
+- Optional: Node.js 18+ only to regenerate the logo and favicon (`tools/brand`).
+
+Nothing else: there is no database server to install. SQLite runs inside the order service from M8 onwards.
+
+## Build and test
+
+From the repository root:
+
+```bash
+dotnet tool restore     # restores the pinned dotnet-ef tool (needed from M8)
+dotnet test             # builds everything and runs all tests
+```
+
+Expected result today: about 1,700 tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
+
+Useful variations:
+
+```bash
+# Run one area of the pricing core
+dotnet test --filter "FullyQualifiedName~PizzaMagic.Domain.Tests.Pricing"
+dotnet test --filter "FullyQualifiedName~PizzaMagic.Domain.Tests.Promotions"
+dotnet test --filter "FullyQualifiedName~PizzaMagic.Domain.Tests.Tax"
+
+# Run the spec's worked pricing examples (P1-P25) and list each one
+dotnet test --filter "FullyQualifiedName~Golden_vectors_price_to_the_cent" --logger "console;verbosity=normal"
+```
+
+Test areas (all in `tests/PizzaMagic.Domain.Tests` so far):
+
+| Folder | Covers |
+|---|---|
+| `Monetary` | Rounding (32.5 cents becomes 33, never banker's rounding), truncation, checked money arithmetic, exact splits, `$1,234.56` formatting |
+| `Catalog` | Topping prices from tiers (8% / 11% of the size price), restaurant overrides and availability, defaults |
+| `Promotions` | Code clean-up, duplicates, limits, conflicts ("SAVE5 can't be combined with ILOVEPIZZA"), validity windows across daylight-saving changes |
+| `Tax` | 6.5% half-up per RCW 82.08.054, the TRUNCATE option, tax lines that sum exactly |
+| `Time` | UTC to Los Angeles local time from stored offset periods, including both 2026 DST switches |
+| `Pricing` | Full quotes: totals to the cent, validation errors with field paths, tips, and properties over 500 generated orders |
+
+## Run the apps
+
+Each app runs in its own terminal, from the repository root:
+
+```bash
+dotnet run --project src/PizzaMagic.OrderManager    # order service: http://localhost:5100/swagger
+dotnet run --project src/PizzaMagic.Web             # order builder: http://localhost:5000
+```
+
+Stop either one with Ctrl+C. The ports come from each project's `Properties/launchSettings.json`. To use a different port, add for example `--urls http://localhost:5200`.
+
+Once the database exists (M8), the order service creates `pizzamagic.db` on first start. Delete `pizzamagic.db*` to reset it. The `.gitignore` already excludes it.
+
+Docker Compose is designed but not part of the built scope (plan M17).
+
+## Repository layout
+
+```
+src/PizzaMagic.Domain/        pricing core (Monetary, Catalog, Pricing, Promotions, Tax, Time)
+src/PizzaMagic.Contracts/     shared contract types and formatters
+src/PizzaMagic.OrderManager/  order service (Web API)
+src/PizzaMagic.Web/           order builder (MVC)
+tests/                        one test project per app plus end-to-end tests
+tools/brand/                  logo and favicon generators
+docs/DEVELOPMENT_PLAN.md      design, decisions (section 10), milestones (section 8)
+docs/ai-log.md                running log of AI use, rejected output and hand verification
+```
+
+## Still to come in this README
+
+The spec also asks for these sections. They are written in M16, when the pieces they describe exist:
+- **Order service API:** endpoints with example requests. The designed API is in plan section 5.
+- **Assumptions:** every ambiguity and the decision made. The current list is in plan section 3, and the user's decisions are in section 10.
+- **Design write-up:** money and rounding, extensibility, the order lifecycle and retries, and what was cut.
+- **AI usage note:** written from [docs/ai-log.md](docs/ai-log.md).
+- **Tested invariants:** which are covered and which are not (plan section 7.2).
