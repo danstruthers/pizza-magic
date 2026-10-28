@@ -1,0 +1,30 @@
+@model PizzaMagic.Web.Models.RecentOrdersViewModel
+@{
+    ViewData["Title"] = "Your orders";
+}
+
+<h1 class="h3">Your orders</h1>
+
+@if (Model.OrderIds.Count == 0)
+{
+    <p class="text-muted">No recent orders in this browser.</p>
+}
+else
+{
+    <ul class="list-group mb-4" style="max-width: 32rem">
+        @foreach (var id in Model.OrderIds)
+        {
+            <li class="list-group-item"><a href="/Orders/@id" class="font-monospace">@id</a></li>
+        }
+    </ul>
+}
+
+<h2 class="h5 mt-4">Find an order</h2>
+<form method="get" action="/Orders/Lookup" class="input-group" style="max-width: 32rem">
+    <input name="orderId" class="form-control font-monospace" placeholder="Order number" aria-label="Order number" autocomplete="off" />
+    <button type="submit" class="btn btn-outline-secondary">Open</button>
+</form>
+@if (Model.LookupMessage is not null)
+{
+    <div class="small text-danger mt-1">@Model.LookupMessage</div>
+}

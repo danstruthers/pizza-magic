@@ -12,10 +12,32 @@
     return;
 }
 
+@{
+    var locked = Model.Cart.PendingTicket is not null;
+}
+
+@if (locked)
+{
+    <div class="alert alert-warning" role="alert">
+        <strong>We couldn't confirm your order.</strong> Your cart is saved and locked until we know whether it went through.
+        <a href="/Checkout" class="alert-link">Check and try again</a>
+    </div>
+}
+else if (Model.Cart.EditingOrderId is { } editing)
+{
+    <div class="alert alert-info d-flex flex-wrap align-items-center gap-2" role="status">
+        <span>You're changing order <a href="/Orders/@editing" class="alert-link font-monospace">@editing</a>. Review your changes to save them.</span>
+        <form method="post" action="/Builder/StartOver" class="ms-auto">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Start a new order instead</button>
+        </form>
+    </div>
+}
+
 <div id="builder" data-menu="@Model.MenuJson" data-cart="@Model.CartJson">
     @Html.AntiForgeryToken()
     <div class="row g-4">
-        <div class="col-lg-8">
+        <div class="col-lg-8" inert="@(locked ? "inert" : null)">
             <h1 class="h3">Build your order</h1>
             <p class="text-muted">Choose a size and toppings for each pizza. Your total updates as you go.</p>
 

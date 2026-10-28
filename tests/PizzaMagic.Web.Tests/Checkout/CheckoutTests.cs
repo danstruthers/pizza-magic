@@ -12,11 +12,14 @@ public class CheckoutTests
     private static ApiResult<QuoteResponse> Priced(long total, IReadOnlyList<string>? codes = null) =>
         ApiResult<QuoteResponse>.Success(Quotes.Simple(total, normalizedCodes: codes, normalizedLines: [Quotes.NormalizedLarge]), null, false);
 
-    /// <summary>A browser with one pizza in its Session cart (saved by the quote proxy).</summary>
+    /// <summary>
+    /// A browser with one pizza in its Session cart. The quote proxy saves the draft even when the quote itself fails
+    /// (some tests rely on that), so only a refused post (400) is an error here.
+    /// </summary>
     private static async Task<HttpClient> CartAsync(WebFactory factory, long revision = 1, string size = "LARGE", params string[] codes)
     {
         var (client, token) = await factory.BrowserAsync();
-        (await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(revision, size, codes))).EnsureSuccessStatusCode();
+        (await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(revision, size, codes))).StatusCode.ShouldNotBe(HttpStatusCode.BadRequest);
         return client;
     }
 

@@ -13,7 +13,7 @@ The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](
 
 ## Current status
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M13**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder page (M13) builds an order with a running total that always comes from the order service; checkout and status pages come in M14.
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M14**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder (M13-M14) builds an order with a running total that always comes from the order service, reviews and places it, and then shows its status, with change and cancel while the kitchen hasn't started it.
 
 | Milestone | What it adds | Status |
 |---|---|---|
@@ -31,13 +31,14 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 | M11 | Update (If-Match) and cancel while Not Started, kitchen advance, and race-proof status changes (cancel vs kitchen start: exactly one wins) | Done |
 | M12 | The order builder's typed client for the order service: safe retries (same Idempotency-Key and body), no retry on 4xx, problems parsed, outages reported instead of thrown | Done |
 | M13 | Order builder page: pizzas, toppings, promo codes and tip, with a running total priced by the order service (never in the browser); the cart is kept in the session, and stale or out-of-order totals are ignored | Done |
-| M14-M15 | Checkout and review, order status pages, end-to-end tests | Next |
+| M14 | Review and place (what Review shows is exactly what is submitted), order page with live status, change and cancel, recent orders and lookup, a safe "Try again" after a lost connection | Done |
+| M15 | End-to-end and architecture tests | Next |
 | M15F | Fantasy realm test database: invented zones, restaurants, tiered taxes 0-75%, a MYTHIC topping tier, themed crusts and sauces | Planned |
 | M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
 
 **What you can look at today:**
 - **The pricing core, through its tests.** Every worked example in the plan (for instance P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = **$31.48**) is a test you can run (see below).
-- **The order builder** at http://localhost:5000 (start the order service too): add pizzas, toppings, promo codes and a tip, and watch the total update. "Review order" leads to checkout, which arrives in M14.
+- **The order builder** at http://localhost:5000 (start the order service too): add pizzas, toppings, promo codes and a tip, and watch the total update; review and place the order; then follow it on its page (it refreshes every 5 seconds), change or cancel it until the kitchen starts it, and find it again under "Your orders". Advance it as the kitchen with the curl command under "Simulate the kitchen".
 - **The order service** at http://localhost:5100/swagger: on first start it creates and seeds `pizzamagic.db` and validates the catalog. Try the menu and price any order in Swagger, or with the ready-made requests in `src/PizzaMagic.OrderManager/PizzaMagic.OrderManager.http` (see "Try the API" below).
 
 ## Prerequisites
@@ -97,7 +98,11 @@ And in `tests/PizzaMagic.Web.Tests`:
 | Folder | Covers |
 |---|---|
 | `Builder` | The builder page rendered from the service's menu, the quote proxy (antiforgery required, newer drafts saved to the session cart, older ones ignored, promo list replaced by the server's normalized codes, field errors passed through, "Total unavailable — retrying" on an outage) |
+| `Checkout` | Review and Place: the sealed review ticket (what Review showed is exactly what is submitted, never the live cart), normalized promo codes and defaults, Place disabled when the order can't be submitted, a tampered or expired ticket refused, "Prices changed" with the new total, field errors, and after a lost connection a locked cart with a safe "Try again" that reuses the same key |
+| `OrderPages` | The order page from its snapshot, buttons that follow the order's allowed actions, the status polling endpoint, change through Review (update with If-Match; 412 and 409 handled), cancel, start over, recent orders and lookup |
 | `Clients` | The order builder's client behind its real retry pipeline: a 503 is retried with the same key and identical body, 4xx is never retried, problem types and fields are parsed, and outages come back as "unavailable" instead of exceptions |
+
+And in `tests/js/order-status.test.mjs`: the order page polls every 5 seconds, stops at Delivered or Cancelled, and keeps going after a failed request.
 
 And in `tests/js/quote-sequencer.test.mjs`: edits are debounced, at most one quote is in flight and only the latest edit is sent after it, an older total never replaces a newer one, promo chips and field errors are shown by path, an outage keeps the last total greyed out, Review is enabled only when the server says the order can be submitted, and cents and percentages are formatted exactly as the server formats them.
 

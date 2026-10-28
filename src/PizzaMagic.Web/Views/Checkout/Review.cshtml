@@ -1,0 +1,98 @@
+@model PizzaMagic.Web.Models.CheckoutViewModel
+@{
+    ViewData["Title"] = Model.IsUpdate ? "Review your changes" : "Review your order";
+    var quote = Model.Quote;
+    var action = Model.IsUpdate ? "Update order" : "Place order";
+}
+
+<h1 class="h3">@ViewData["Title"]</h1>
+@Html.AntiForgeryToken()
+
+@if (Model.Banner is not null)
+{
+    <div class="alert alert-warning" role="alert">@Model.Banner</div>
+}
+
+@if (Model.IsPending)
+{
+    <div class="alert alert-warning" role="alert">
+        <p class="mb-2"><strong>We couldn't confirm your order. Your cart is saved.</strong></p>
+        <p class="mb-3">It may already have gone through. Trying again is safe: you will never be charged twice, and if the restaurant already has your order, we'll show it.</p>
+        <form method="post" action="/Checkout/Place">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ticket" value="@Model.Ticket" />
+            <button type="submit" class="btn btn-primary">Try again — @Display.Money(Model.PendingTotalCents!.Value)</button>
+        </form>
+    </div>
+    return;
+}
+
+@if (Model.Messages.Count > 0)
+{
+    <div class="alert @(quote is null ? "alert-danger" : "alert-warning")" role="alert">
+        <ul class="mb-0">
+            @foreach (var message in Model.Messages)
+            {
+                <li>@message</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (quote is not null)
+{
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <table class="table">
+                <tbody>
+                    @foreach (var line in quote.LineItems)
+                    {
+                        <tr><td>@line.Description</td><td class="text-end">@Display.Money(line.LineTotalCents)</td></tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (quote.Promotions.Count > 0)
+            {
+                <h2 class="h6">Promo codes</h2>
+                <ul class="list-unstyled small">
+                    @foreach (var promo in quote.Promotions)
+                    {
+                        <li>
+                            <span class="badge @(promo.Status == "Applied" ? "text-bg-success" : "text-bg-warning")">@promo.Code</span>
+                            @promo.Message
+                        </li>
+                    }
+                </ul>
+            }
+
+            <h2 class="h6">Order description</h2>
+            <pre class="small bg-light p-2" style="white-space: pre-wrap">@quote.Description</pre>
+        </div>
+
+        <aside class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-6 fw-normal">Subtotal</dt><dd class="col-6 text-end">@Display.Money(quote.SubtotalCents)</dd>
+                        <dt class="col-6 fw-normal">Discounts</dt><dd class="col-6 text-end">−@Display.Money(quote.DiscountCents)</dd>
+                        <dt class="col-6 fw-normal">Tax</dt><dd class="col-6 text-end">@Display.Money(quote.TaxCents)</dd>
+                        <dt class="col-6 fw-normal">Tip</dt><dd class="col-6 text-end">@Display.Tip(quote.Tip)</dd>
+                        <dt class="col-6 fs-5">Total</dt><dd class="col-6 text-end fs-5 fw-bold">@Display.Money(quote.TotalCents)</dd>
+                    </dl>
+                    @if (Model.Ticket is not null)
+                    {
+                        <form method="post" action="/Checkout/Place" class="mt-3">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ticket" value="@Model.Ticket" />
+                            <button type="submit" class="btn btn-primary w-100">@action — @Display.Money(quote.TotalCents)</button>
+                        </form>
+                        <p class="small text-muted mt-2 mb-0">Pay when you pick up your order.</p>
+                    }
+                </div>
+            </div>
+        </aside>
+    </div>
+}
+
+<a href="/" class="btn btn-link px-0 mt-3">← Back to builder</a>

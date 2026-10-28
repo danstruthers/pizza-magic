@@ -20,6 +20,8 @@ if (root) {
       sizeCode: l.sizeCode,
       quantity: l.quantity,
       toppings: (l.toppings ?? []).map((t) => t.code),
+      crustCode: l.crustCode ?? null,   // kept from an order being changed; the builder has no crust/sauce picker yet (X2)
+      sauceCode: l.sauceCode ?? null,
     })),
     promoCodes: [...(saved.promoCodes ?? [])],
     tip: saved.tip ?? null,
@@ -52,6 +54,8 @@ if (root) {
         sizeCode: l.sizeCode,
         quantity: l.quantity,
         toppings: l.toppings.map((code) => ({ code })),
+        crustCode: l.crustCode,
+        sauceCode: l.sauceCode,
       })),
       promoCodes: state.promoCodes,
       tip: state.tip,
@@ -103,7 +107,7 @@ if (root) {
   }
 
   document.getElementById('add-line').addEventListener('click', () => {
-    state.lines.push({ sizeCode: menu.sizes[0].code, quantity: 1, toppings: [] });
+    state.lines.push({ sizeCode: menu.sizes[0].code, quantity: 1, toppings: [], crustCode: null, sauceCode: null });
     renderLines();
     changed();
   });

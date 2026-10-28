@@ -31,7 +31,8 @@ public sealed class BuilderController(IOrderManagerClient orderManager, IConfigu
     public async Task<IActionResult> Quote([FromBody] BuilderDraft draft)
     {
         var cart = CartStore.Load(HttpContext.Session);
-        var isNewest = draft.Revision > cart.Revision;
+        // While an order waits for confirmation the cart is locked: drafts are still priced, never saved.
+        var isNewest = cart.PendingTicket is null && draft.Revision > cart.Revision;
         if (isNewest)
         {
             cart = cart with
@@ -63,11 +64,18 @@ public sealed class BuilderController(IOrderManagerClient orderManager, IConfigu
         };
     }
 
-    /// <summary>Empties the cart and leaves edit mode (not while an order is waiting for confirmation). M14 red stub.</summary>
+    /// <summary>Empties the cart and leaves edit mode (not while an order is waiting for confirmation).</summary>
     [HttpPost("/Builder/StartOver")]
     [ValidateAntiForgeryToken]
-    public IActionResult StartOver() => throw new NotImplementedException();
+    public IActionResult StartOver()
+    {
+        if (CartStore.Load(HttpContext.Session).PendingTicket is not null)
+        {
+            return Redirect("/Checkout");
+        }
+        CartStore.Save(HttpContext.Session, CartState.Empty());
+        return Redirect("/");
+    }
 
-    private long? RestaurantId() =>
-        long.TryParse(configuration["OrderManager:RestaurantId"], out var id) ? id : null;
+    private long? RestaurantId() => ConfiguredRestaurant.Id(configuration);
 }

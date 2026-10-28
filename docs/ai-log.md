@@ -112,3 +112,17 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - All 11 quote-sequencer tests fail against the `NotImplementedException` stub, and pass against the real module.
 - On the running pair: the page rendered the seed menu; the quote proxy returned the priced quote for 2 Large Pepperoni with ILOVEPIZZA; quantity 0 came back as 422 at `lineItems[0].quantity`; a post without the antiforgery header got 400; the session cart survived a reload; a stale draft (revision 1 after revision 2) did not overwrite it; `.mjs` is served as `text/javascript`.
 - Not covered by an automated test yet: the DOM wiring in `order-builder.js` (syntax-checked only). The M15 end-to-end tests are where it gets exercised in a browser.
+
+## 2026-10-28: M14 checkout and order pages
+
+**Fixed AI output:**
+- The first checkout test helper called `EnsureSuccessStatusCode()` on the builder quote, but two tests deliberately make that quote fail (so the cart keeps un-normalized input). The helper now only rejects a refused (400) post. The app was right; the test was wrong.
+- A C# string literal containing `
+`, written through a shell script, became real line breaks and broke the build. It was fixed with an exact edit.
+- The plan had `GET /Orders/{id}/Edit`, which changes the Session. It is built as an antiforgery POST, and the plan row was updated.
+
+**Verified rather than trusted:**
+- Removing the cart lock (saving builder drafts while an order is waiting for confirmation) fails exactly `Place_unavailable_keeps_ticket_and_locks_cart`. Removing the key rotation on content change fails exactly `Key_reused_until_content_changes`. Both were reverted, and a search confirms no `false &&` remains.
+- All 28 new C# tests and 4 new JS tests failed against the stubs before the implementation.
+- On the running pair: the P9 order (2 Large Pepperoni + Bacon, ILOVEPIZZA, 15% tip) reviewed and placed at $31.48; it appeared under "Your orders"; Change loaded it into the builder, and updating it to one Medium Pepperoni gave $8.05 (version 2); after a kitchen advance the status endpoint showed Started, the page dropped its buttons, and cancel showed the kitchen message; lookup by number redirected to the order.
+- Not covered by an automated test: the DOM wiring in `order-details.js` and `order-builder.js` (syntax-checked only); M15's end-to-end tests exercise them.

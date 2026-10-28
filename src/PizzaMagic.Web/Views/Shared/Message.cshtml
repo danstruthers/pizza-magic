@@ -1,0 +1,8 @@
+@model PizzaMagic.Web.Models.MessageViewModel
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<h1 class="h3">@Model.Title</h1>
+<p>@Model.Text</p>
+<p><a href="/Orders">Your recent orders</a> · <a href="/">Start a new order</a></p>
