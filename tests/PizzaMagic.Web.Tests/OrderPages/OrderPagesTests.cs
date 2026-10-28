@@ -235,6 +235,53 @@ public class OrderPagesTests
         WebFactory.Text(await client.GetStringAsync("/Orders")).ShouldContain("No recent orders in this browser.");
     }
 
+    /// <summary>A browser that has placed the sample order (1 Large Pepperoni, $13.80) through Review and Place.</summary>
+    private static async Task<HttpClient> PlacedAsync(WebFactory factory)
+    {
+        factory.OrderManager.Quote = _ => ApiResult<QuoteResponse>.Success(Quotes.Simple(1380, normalizedLines: [Quotes.NormalizedLarge]), null, false);
+        var (client, token) = await factory.BrowserAsync();
+        await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(1, "LARGE"));
+        var review = await WebFactory.ReviewAsync(client);
+        (await WebFactory.PlaceAsync(client, review.Token, review.Ticket!)).StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        return client;
+    }
+
+    // Each recent order shows its current status, when it was placed (restaurant time), what's on it and the total.
+    [Fact]
+    public async Task Recent_orders_show_status_date_and_summary()
+    {
+        await using var factory = new WebFactory();
+        var client = await PlacedAsync(factory);
+        factory.OrderManager.Order = id => ApiResult<OrderResponse>.Success(SampleOrders.Order("Started", 2, id), "\"2\"", false);
+
+        var raw = await client.GetStringAsync("/Orders");
+        var html = WebFactory.Text(raw);
+
+        raw.ShouldContain($"href=\"{DetailsUrl}\"");
+        html.ShouldContain("Started");
+        html.ShouldContain("Oct 28, 2026, 12:00 PM PDT");
+        html.ShouldContain("1 x Large pizza with Pepperoni");
+        html.ShouldContain("$13.80");
+    }
+
+    // The list never breaks because one order can't be read: that order shows its number and a short note.
+    [Fact]
+    public async Task Recent_orders_list_an_order_whose_details_are_unavailable()
+    {
+        await using var factory = new WebFactory();
+        var client = await PlacedAsync(factory);
+
+        factory.OrderManager.Order = _ => ApiResult<OrderResponse>.Unavailable("timeout");
+        var unavailable = WebFactory.Text(await client.GetStringAsync("/Orders"));
+        factory.OrderManager.Order = _ => ApiResult<OrderResponse>.Failed(Problems.Of(ProblemTypes.OrderNotFound, 404));
+        var missing = WebFactory.Text(await client.GetStringAsync("/Orders"));
+
+        unavailable.ShouldContain(SampleOrders.Id.ToString());
+        unavailable.ShouldContain("Details unavailable right now.");
+        missing.ShouldContain(SampleOrders.Id.ToString());
+        missing.ShouldContain("Order not found.");
+    }
+
     [Fact]
     public async Task Lookup_redirects_to_a_valid_order_number()
     {
