@@ -23,4 +23,37 @@ public static class LocalTimeResolver
         }
         return null;
     }
+
+    /// <summary>
+    /// The earliest UTC instant at which the local clock reads <paramref name="local"/> or later (plan section 2.6.1).
+    /// An ambiguous local time (fall-back repeated hour) resolves to its first occurrence; a nonexistent one
+    /// (spring-forward gap) resolves to the first instant after the gap. Null when outside the zone's coverage.
+    /// </summary>
+    public static DateTimeOffset? Boundary(TimeZonePeriods zone, DateTime local)
+    {
+        if (zone.Periods.Count == 0)
+        {
+            return null;
+        }
+
+        var wallClock = DateTime.SpecifyKind(local, DateTimeKind.Utc);
+        DateTime? earliest = null;
+        foreach (var period in zone.Periods)
+        {
+            var atThisOffset = wallClock.AddMinutes(-period.UtcOffsetMinutes);
+            var candidate = atThisOffset < period.ValidFromUtc ? period.ValidFromUtc : atThisOffset;
+            if (candidate < period.ValidToUtc && (earliest is null || candidate < earliest))
+            {
+                earliest = candidate;
+            }
+        }
+
+        // If the clock would read the value before the first covered instant, the true answer is unknown.
+        var first = zone.Periods.MinBy(p => p.ValidFromUtc)!;
+        if (earliest is null || wallClock.AddMinutes(-first.UtcOffsetMinutes) < first.ValidFromUtc)
+        {
+            return null;
+        }
+        return new DateTimeOffset(earliest.Value, TimeSpan.Zero);
+    }
 }

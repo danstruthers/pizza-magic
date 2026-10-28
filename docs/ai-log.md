@@ -29,3 +29,11 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 ## 2026-10-28: M2 catalog, line pricing, local time
 
 **Fixed AI output:** the first draft of `EffectiveMenu` computed the default crust and sauce in its constructor from a set of default ids that was only assigned by an `init` property afterwards. The global `is_default` flags would therefore have been silently ignored, and the fallback (lowest sort order) would have hidden the bug with the seed data. It was caught on review before the first build, and the ids became a constructor argument. A follow-up review found that no test would have caught it: in the seed, `HAND_TOSSED` is both the default and the lowest-sorted crust. `Global_default_wins_over_a_lower_sort_order` was added, and reintroducing the bug makes exactly that test fail (93 pass, 1 fails).
+
+## 2026-10-28: M3 promotion engine
+
+**Verified rather than trusted:** two deliberate mutations, each reverted afterwards.
+- Making exclusivity one-sided (an exclusive code only blocks codes entered after it) fails exactly 1 test (PR15, `[ILOVEPIZZA, EXCL]`).
+- Comparing the promo end against the local wall clock instead of the resolved UTC boundary fails exactly 2 tests: the 09:00Z and 09:15Z cases on the fall-back night, where the naive comparison re-opens an expired promo. This is the flicker the design exists to prevent (PR13b).
+
+**Fixed AI output:** two of the first-draft tests were wrong before the first run. One zero-discount test assumed the wrong application order: equal priorities fall back to promotion id, so ILOVEPIZZA (id 1) applied first. The other test, described as "dropped codes block nothing", actually tested the code limit. Both were rewritten before committing the red tests.
