@@ -140,3 +140,15 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - A planted `ProjectReference` from Web to Domain fails `Web_does_not_reference_Domain_or_EF`.
 - The scanner's own test checks that numbers and `Math.Round` inside comments, regular, verbatim and character literals are ignored while real code is not, and that line numbers survive.
 - The lost-response flow checks the database directly: one order after the lost response, still one after Try again.
+
+## 2026-10-28: M16 README
+
+**Fixed AI output (before commit):**
+- The first draft attributed the open-question decisions to a "product owner" and wrote the AI note as if the author had personally run the mutation checks. Both were reworded to say who actually did what: the decisions are the author's (plan section 10), and the checks were run by the agent in the session.
+- It cited "conflict tests driven by `promotion_incompatibility` rows" from the plan, but no test by that description could be found. The claim was replaced by tests that exist.
+- The design write-up first came to about 1,060 words; it was cut to about 800 (with the SQL example) for the spec's "~1 page".
+
+**Verified rather than trusted:**
+- The README's data-only example (a PARTY size and a BIGTEN promo conflicting with both codes) was run as a seed script on a scratch database: Pepperoni on a Party priced at $1.44, 3 Party Pepperoni with BIGTEN totalled $51.46, SAVE5 was rejected with the conflict message, and below $50 BIGTEN explained why. The script and database were deleted afterwards.
+- Every API example in the README was run verbatim on a fresh database: the quote returned 3148; the same submit twice returned 201 then a replay (`Idempotent-Replayed: true`, same id); the update returned 200 with ETag "2"; cancel returned 200 Cancelled twice; the conflict message matched; the description endpoint returned 200.
+- The conditional `UPDATE` predicates quoted in the write-up were checked against `OrderService` (cancel: `status = NotStarted`; kitchen: `status = expected`).

@@ -2,174 +2,207 @@
 
 A pizza order builder with a separate order service. A customer builds an order, watches the total update as they change it, and sends it to the restaurant's order service. They can then check on the order and, until the kitchen starts it, change or cancel it.
 
+```
+ Browser ──HTML / fetch──▶ Order builder (MVC, :5000) ──HTTP + retries──▶ Order service (Web API, :5100) ──▶ SQLite
+           (renders only)   cart in Session, review ticket                 ALL pricing, validation,
+                            NO pricing, NO database                        orders, idempotency, status
+```
+
 | Piece | Project | What it is | URL when running |
 |---|---|---|---|
 | Order builder | `src/PizzaMagic.Web` | ASP.NET Core 8 MVC app for customers (no login) | http://localhost:5000 |
 | Order service | `src/PizzaMagic.OrderManager` | ASP.NET Core 8 Web API; the only process that touches the database (SQLite) | http://localhost:5100 (Swagger at `/swagger`) |
-| Pricing core | `src/PizzaMagic.Domain` | Pure C# library: menu, pricing, promotions, tax, local time | (library) |
-| Wire contract | `src/PizzaMagic.Contracts` | Shared DTOs and the money / percent formatters | (library) |
+| Pricing core | `src/PizzaMagic.Domain` | Pure C# library used only by the order service: menu, pricing, promotions, tax, local time | (library) |
+| Wire contract | `src/PizzaMagic.Contracts` | Shared request/response types and the `$` / `%` formatters | (library) |
 
-The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).
+Sections: [Run it](#run-it) · [Using it](#using-it) · [Order service API](#order-service-api) · [Assumptions](#assumptions) · [Design write-up](#design-write-up) · [Tests and invariants](#tests-and-invariants) · [AI usage note](#ai-usage-note) · [Status and cut list](#status-and-cut-list)
 
-## Current status
+The full design, every decision and the milestone plan are in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md). Things marked **designed, not built** there are specified (with test vectors) but deliberately not implemented.
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M15**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder (M13-M14) builds an order with a running total that always comes from the order service, reviews and places it, and then shows its status, with change and cancel while the kitchen hasn't started it. End-to-end tests (M15) run both apps together and check the architecture rules.
+## Run it
 
-| Milestone | What it adds | Status |
-|---|---|---|
-| M0 | Solution, package pins, ports, smoke test | Done |
-| M1 | Money in integer cents, the two named rounding rules, exact splitting, `$` formatting | Done |
-| M2 | Menu with per-restaurant overrides, pizza line pricing, restaurant local time | Done |
-| M3 | Promotion engine: ILOVEPIZZA / SAVE5 as data, conflicts, validity windows | Done |
-| M4 | Tax: Washington 6.5%, rounding method from the jurisdiction's data | Done |
-| M5 | Pricing engine: validation, discounts, tax, tip (with effective %), totals | Done |
-| M6 | Order description: "2 x Large pizza with Pepperoni, Bacon", promos, tax, tip, total | Done |
-| M7 | Order state machine: kitchen steps forward, customer cancels only while Not Started | Done |
-| M8 | Database: full SQLite schema, seed scripts (menu, WA tax, promos, time zones), startup validation | Done |
-| M9 | API: `GET /api/v1/menu` and `POST /api/v1/quotes` (live pricing with validation errors by field) | Done |
-| M10 | Order API: idempotent submit (Idempotency-Key, price check against the confirmed total), order / status / description from the stored snapshot | Done |
-| M11 | Update (If-Match) and cancel while Not Started, kitchen advance, and race-proof status changes (cancel vs kitchen start: exactly one wins) | Done |
-| M12 | The order builder's typed client for the order service: safe retries (same Idempotency-Key and body), no retry on 4xx, problems parsed, outages reported instead of thrown | Done |
-| M13 | Order builder page: pizzas, toppings, promo codes and tip, with a running total priced by the order service (never in the browser); the cart is kept in the session, and stale or out-of-order totals are ignored | Done |
-| M14 | Review and place (what Review shows is exactly what is submitted), order page with live status, change and cancel, recent orders and lookup, a safe "Try again" after a lost connection | Done |
-| M15 | End-to-end tests (both real apps, in-process: build, place, change, cancel, kitchen start, a lost response then Try again, an outage) and architecture rules (who may reference whom, no pricing literals or library rounding in the engine, truncation only for the TRUNCATE tax method) | Done |
-| M15F | Fantasy realm test database: invented zones, restaurants, tiered taxes 0-75%, a MYTHIC topping tier, themed crusts and sauces | Planned |
-| M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Next |
+Prerequisites: [.NET SDK 8.0.427](https://dotnet.microsoft.com/download/dotnet/8.0) or a later 8.0 feature band (pinned in `global.json`). Optional: Node.js 18+ for the browser-script tests. Nothing else: SQLite runs inside the order service.
 
-**What you can look at today:**
-- **The pricing core, through its tests.** Every worked example in the plan (for instance P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = **$31.48**) is a test you can run (see below).
-- **The order builder** at http://localhost:5000 (start the order service too): add pizzas, toppings, promo codes and a tip, and watch the total update; review and place the order; then follow it on its page (it refreshes every 5 seconds), change or cancel it until the kitchen starts it, and find it again under "Your orders". Advance it as the kitchen with the curl command under "Simulating the restaurant" (in "Try the API").
-- **The order service** at http://localhost:5100/swagger: on first start it creates and seeds `pizzamagic.db` and validates the catalog. Try the menu and price any order in Swagger, or with the ready-made requests in `src/PizzaMagic.OrderManager/PizzaMagic.OrderManager.http` (see "Try the API" below).
-
-## Prerequisites
-
-- [.NET SDK 8.0.427](https://dotnet.microsoft.com/download/dotnet/8.0) or a later 8.0 feature band (pinned in `global.json`).
-- Optional: Node.js 18+ to run the browser-script tests (`tests/js`) and to regenerate the logo and favicon (`tools/brand`).
-
-Nothing else: there is no database server to install. SQLite runs inside the order service from M8 onwards.
-
-## Build and test
-
-From the repository root:
-
-```bash
-dotnet tool restore     # restores the pinned dotnet-ef tool
-dotnet test             # builds everything and runs all tests
-node --test "tests/js/*.test.mjs"   # the builder page's quote sequencing (needs Node.js)
-```
-
-Node 22+ needs the quoted glob; a bare directory (`node --test tests/js`) is not accepted.
-
-Expected result today: about 2,060 .NET tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
-
-Useful variations:
-
-```bash
-# Run one area of the pricing core
-dotnet test --filter "FullyQualifiedName~PizzaMagic.Domain.Tests.Pricing"
-dotnet test --filter "FullyQualifiedName~PizzaMagic.Domain.Tests.Promotions"
-dotnet test --filter "FullyQualifiedName~PizzaMagic.Domain.Tests.Tax"
-
-# Run the spec's worked pricing examples (P1-P25) and list each one
-dotnet test --filter "FullyQualifiedName~Golden_vectors_price_to_the_cent" --logger "console;verbosity=normal"
-```
-
-Test areas in `tests/PizzaMagic.Domain.Tests`:
-
-| Folder | Covers |
-|---|---|
-| `Monetary` | Rounding (32.5 cents becomes 33, never banker's rounding), truncation, checked money arithmetic, exact splits, `$1,234.56` formatting |
-| `Catalog` | Topping prices from tiers (8% / 11% of the size price), restaurant overrides and availability, defaults |
-| `Promotions` | Code clean-up, duplicates, limits, conflicts ("SAVE5 can't be combined with ILOVEPIZZA"), validity windows across daylight-saving changes |
-| `Tax` | 6.5% half-up per RCW 82.08.054, the TRUNCATE option, tax lines that sum exactly |
-| `Time` | UTC to Los Angeles local time from stored offset periods, including both 2026 DST switches |
-| `Pricing` | Full quotes: totals to the cent, validation errors with field paths, tips, and properties over 500 generated orders |
-| `Ordering` | The order description and every allowed or refused status change (all 25 status pairs for each actor) |
-
-And in `tests/PizzaMagic.OrderManager.Tests` (each test builds a real SQLite database in a temp file):
-
-| Folder | Covers |
-|---|---|
-| `Api` | The menu, quote and order endpoints over HTTP against a real database: prices to the cent, promo outcomes, field errors by path, idempotent submission (including 50 parallel retries with one key), quote = submitted = stored total for every spec example, orders unchanged by later price, tax or promo edits, update/cancel/kitchen rules and their check order, and cancel-vs-kitchen and edit-vs-kitchen races |
-| `Persistence` | All 33 tables and their CHECK / foreign-key rules, the seed matching the spec, the spec examples priced from the database, the seed-script runner, startup validation, UTC and local time columns, and the time zone seed matching tzdb |
-
-And in `tests/PizzaMagic.Web.Tests`:
-
-| Folder | Covers |
-|---|---|
-| `Builder` | The builder page rendered from the service's menu, the quote proxy (antiforgery required, newer drafts saved to the session cart, older ones ignored, promo list replaced by the server's normalized codes, field errors passed through, "Total unavailable — retrying" on an outage) |
-| `Checkout` | Review and Place: the sealed review ticket (what Review showed is exactly what is submitted, never the live cart), normalized promo codes and defaults, Place disabled when the order can't be submitted, a tampered or expired ticket refused, "Prices changed" with the new total, field errors, and after a lost connection a locked cart with a safe "Try again" that reuses the same key |
-| `OrderPages` | The order page from its snapshot, buttons that follow the order's allowed actions, the status polling endpoint, change through Review (update with If-Match; 412 and 409 handled), cancel, start over, recent orders and lookup |
-| `Clients` | The order builder's client behind its real retry pipeline: a 503 is retried with the same key and identical body, 4xx is never retried, problem types and fields are parsed, and outages come back as "unavailable" instead of exceptions |
-
-And in `tests/PizzaMagic.EndToEnd.Tests` (the real order builder talking to the real order service, both in-process, on a temp SQLite database; only the network between them is simulated):
-
-| Folder | Covers |
-|---|---|
-| `Flows` | The builder's total equals the API's quote; the promo conflict message; build, review, place, status, change and cancel with the same total on every page and in the database; the kitchen starts the order and cancel is refused; the order service commits an order but the response is lost, and Try again returns the same order (exactly one in the database); the order service is down, then back |
-| `Architecture` | Domain and Contracts reference nothing; the order builder references only Contracts (never Domain, EF Core or SQLite); no runtime time zone library or `TimeZoneInfo` in `src/`; no pricing literals, floating point or library rounding in the pricing engine; `Truncate` used only by the TRUNCATE tax method |
-
-And in `tests/js/order-status.test.mjs`: the order page polls every 5 seconds, stops at Delivered or Cancelled, and keeps going after a failed request.
-
-And in `tests/js/quote-sequencer.test.mjs`: edits are debounced, at most one quote is in flight and only the latest edit is sent after it, an older total never replaces a newer one, promo chips and field errors are shown by path, an outage keeps the last total greyed out, Review is enabled only when the server says the order can be submitted, and cents and percentages are formatted exactly as the server formats them.
-
-## Run the apps
-
-Each app runs in its own terminal, from the repository root:
+From the repository root, each app in its own terminal:
 
 ```bash
 dotnet run --project src/PizzaMagic.OrderManager    # order service: http://localhost:5100/swagger
 dotnet run --project src/PizzaMagic.Web             # order builder: http://localhost:5000
 ```
 
-Stop either one with Ctrl+C. The ports come from each project's `Properties/launchSettings.json`. To use a different port, add for example `--urls http://localhost:5200`.
+On first start the order service creates `pizzamagic.db` next to its project, applies the seed scripts in `data/seed` (menu, Washington tax, ILOVEPIZZA / SAVE5, time zones) and validates the catalog; it refuses to start on invalid data. To reset, stop it and delete `src/PizzaMagic.OrderManager/pizzamagic.db*`. Ports come from each project's `Properties/launchSettings.json` (override with `--urls`). Docker Compose is designed but not built.
 
-On first start the order service creates `pizzamagic.db` next to the project, applies the seed scripts in `data/seed`, and validates the catalog (it refuses to start if the data is invalid). Delete `pizzamagic.db*` to reset it; the `.gitignore` already excludes it. The time zone seed is generated: after a NodaTime upgrade, run `dotnet run --project tools/PizzaMagic.TzSeedGen` from the repository root and commit the result.
-
-Docker Compose is designed but not part of the built scope (plan M17).
-
-## Try the API
-
-With the order service running (bash or Git Bash; in PowerShell use the `.http` file or Swagger instead):
+Tests:
 
 ```bash
-# The menu, with server-computed topping prices
-curl http://localhost:5100/api/v1/menu
-
-# Price an order (P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = $31.48)
-curl -X POST http://localhost:5100/api/v1/quotes -H 'Content-Type: application/json' -d '{"lineItems":[{"kind":"Pizza","sizeCode":"LARGE","quantity":2,"toppings":[{"code":"PEPPERONI"},{"code":"BACON"}]}],"promoCodes":["ILOVEPIZZA"],"tip":{"mode":"Percent","value":"15"}}'
+dotnet test                          # about 2,060 .NET tests: pricing core, order service, order builder, end-to-end
+node --test "tests/js/*.test.mjs"    # the two browser modules with logic (needs Node.js; keep the quotes)
 ```
 
-The quote returns every intermediate value (line prices, discounts and where they landed, tax lines, tip, total), a written description, the order as the server will accept it (`normalizedDraft`) and whether it can be submitted (`canSubmit`). Promo code problems never fail a quote: each code gets its own status (Applied, NotEligible, Rejected, InvalidFormat, ...). Field errors return 422 with a message per JSON path. To place an order, POST the same draft to `/api/v1/orders` with an `Idempotency-Key` header and `expectedTotalCents` set to the quoted total: a retry with the same key returns the same order (`Idempotent-Replayed: true`), and a total that no longer matches returns 409 with the current quote. Once placed, an order can be changed with `PUT /api/v1/orders/{id}` (header `If-Match: "<version>"`) or cancelled with `POST /api/v1/orders/{id}/cancel`, but only while it is Not Started.
+The build treats warnings as errors. To list the spec's worked pricing examples as they run: `dotnet test --filter "FullyQualifiedName~Golden_vectors_price_to_the_cent" --logger "console;verbosity=normal"`.
 
-**Simulating the restaurant.** The kitchen moves an order forward one step at a time with
+## Using it
+
+1. Open http://localhost:5000. Add pizzas (size, quantity, whole toppings), promo codes and a tip (preset %, custom % or dollars). The total updates as you go; "Describe my order" shows the written description.
+2. **Review order** prices the order again and shows exactly what will be charged. **Place order** sends it and opens the order's page (save the link; "Your orders" also lists it).
+3. While the order is Not Started, **Change order** (back through the builder and Review) and **Cancel order** are available. The page polls the status every 5 seconds.
+4. **Simulate the kitchen** (the restaurant side): advance an order one step at a time, sending the status you expect it to be in:
+
+   ```bash
+   curl -X POST http://localhost:5100/api/v1/kitchen/orders/<orderId>/advance -H 'Content-Type: application/json' -d '{"expectedStatus":"NotStarted"}'
+   ```
+
+   `NotStarted` → `Started` → `ReadyForPickup` → `Delivered`. Repeating a call is safe (`alreadyApplied: true`). The same endpoint is in Swagger and in `src/PizzaMagic.OrderManager/PizzaMagic.OrderManager.http`. Once started, the order page drops its buttons and change/cancel are refused. (A timer-driven simulator is designed, not built.)
+
+## Order service API
+
+JSON over HTTP under `/api/v1`, money as integer cents, codes as catalog codes. Errors are RFC 9457 problem details with a stable `type` (for example `.../problems/price-changed`) and, for validation, messages keyed by JSON path (`lineItems[0].quantity`). Unknown JSON properties are rejected (400).
+
+| Endpoint | Purpose | Notes |
+|---|---|---|
+| `GET /menu` | Sizes, toppings by tier with the server-computed price for each size, tip presets and limits | Promo codes are not listed |
+| `POST /quotes` | Price a draft order: every intermediate value, a description, `normalizedDraft`, `canSubmit` | No writes. Promo problems never fail a quote (each code gets a status); invalid fields → 422 |
+| `POST /orders` | Place an order → 201 with `orderId`, `ETag: "1"`, `Location` | **`Idempotency-Key` required.** `expectedTotalCents` = the total the customer confirmed; a different current total → 409 `price-changed` with the current quote |
+| `GET /orders/{id}` | The stored order (from its snapshot, never re-priced), status, allowed actions | |
+| `GET /orders/{id}/status` | Light status payload for polling | Includes the restaurant's local time of the last change |
+| `GET /orders/{id}/description` | The written description | |
+| `PUT /orders/{id}` | Replace the order's content while Not Started | **`If-Match: "<version>"` required** (412 if stale); `Idempotency-Key` optional; 409 once the kitchen has started |
+| `POST /orders/{id}/cancel` | Cancel while Not Started | 409 once started; cancelling a cancelled order returns it again |
+| `POST /kitchen/orders/{id}/advance` | Restaurant side: one step forward | `expectedStatus` required; repeats return `alreadyApplied` |
+
+Examples (bash or Git Bash; on Windows PowerShell use `curl.exe` with the same arguments, the `.http` file, or Swagger):
 
 ```bash
-curl -X POST http://localhost:5100/api/v1/kitchen/orders/<orderId>/advance -H 'Content-Type: application/json' -d '{"expectedStatus":"NotStarted"}'
+# Price P9: 2 Large with pepperoni and bacon, ILOVEPIZZA, 15% tip -> totalCents 3148 ($31.48)
+curl -X POST http://localhost:5100/api/v1/quotes -H 'Content-Type: application/json' \
+  -d '{"lineItems":[{"kind":"Pizza","sizeCode":"LARGE","quantity":2,"toppings":[{"code":"PEPPERONI"},{"code":"BACON"}]}],"promoCodes":["ILOVEPIZZA"],"tip":{"mode":"Percent","value":"15"}}'
+
+# Place it. Sending the same request again with the same key returns the same order (Idempotent-Replayed: true).
+curl -i -X POST http://localhost:5100/api/v1/orders -H 'Content-Type: application/json' -H 'Idempotency-Key: readme-order-1' \
+  -d '{"lineItems":[{"kind":"Pizza","sizeCode":"LARGE","quantity":2,"toppings":[{"code":"PEPPERONI"},{"code":"BACON"}]}],"promoCodes":["ILOVEPIZZA"],"tip":{"mode":"Percent","value":"15"},"expectedTotalCents":3148}'
+
+# Status, then change it to one Medium pepperoni ($8.05) while Not Started, then cancel
+curl http://localhost:5100/api/v1/orders/<orderId>/status
+curl -i -X PUT http://localhost:5100/api/v1/orders/<orderId> -H 'Content-Type: application/json' -H 'If-Match: "1"' -H 'Idempotency-Key: readme-update-1' \
+  -d '{"lineItems":[{"kind":"Pizza","sizeCode":"MEDIUM","quantity":1,"toppings":[{"code":"PEPPERONI"}]}],"promoCodes":[],"tip":null,"expectedTotalCents":805}'
+curl -X POST http://localhost:5100/api/v1/orders/<orderId>/cancel
 ```
 
-(`NotStarted` -> `Started` -> `ReadyForPickup` -> `Delivered`; send the status you expect the order to be in). Repeating the same call is safe: it returns `alreadyApplied: true` instead of advancing twice. Once the kitchen has started an order, update and cancel return 409 with the time it started. If a cancel and a kitchen start arrive at the same moment, exactly one wins (tested 50 times in a row). A timer-driven simulator is designed but not built (plan M18).
+A conflicting second code is not an error on a quote: `"promoCodes":["ILOVEPIZZA","SAVE5"]` returns ILOVEPIZZA `Applied` and SAVE5 `Rejected` with "SAVE5 can't be combined with ILOVEPIZZA. Remove ILOVEPIZZA to use SAVE5." The `.http` file has more examples (dollar tip with its effective %, field errors, conflicts).
 
-More examples, including a conflicting promo code, a dollar tip with its effective percentage, field errors and order submission, are in `PizzaMagic.OrderManager.http`, which Visual Studio and VS Code (REST Client) can run directly.
+## Assumptions
 
-## Repository layout
+Every place the rules were open, and what was decided. The full table (A1–A74, with rationale) is in plan section 3, and the decisions on the open questions (UQ1–UQ28) are in section 10.
+
+**Prices and rounding**
+- Money is integer cents. Rounding is half away from zero ($0.325 → $0.33), never banker's rounding, and every rounded amount is rounded **before** it is multiplied by a quantity.
+- "8% / 11% of the base pizza price" is of the **size price** only, rounded per pizza (Medium + bacon: 11% of $7.00 = $0.77), then × quantity. Quantity multiplies the whole pizza, toppings included.
+- A pizza with no toppings is valid. Quantity is 1–20 per line and 1–20 lines; 0 is an error, not a removal (removing a line means leaving it out).
+
+**Tax**
+- "6.5% of the total order" is charged on the merchandise subtotal **after discounts**, once per order (never per line), and never on the tip.
+- 6.5% is Washington's state rate, so the restaurant is modeled in Washington (time zone America/Los_Angeles). Tax is rounded the way Washington law says (RCW 82.08.054: half-up on the combined tax, per invoice). The rounding method is per-jurisdiction data, so a jurisdiction that truncates can say so. Confirm with a tax professional before real use.
+
+**Promo codes**
+- Codes are trimmed and case-insensitive; duplicates collapse; at most 3 distinct codes.
+- ILOVEPIZZA: 10% of the pre-tax subtotal, rounded once.
+- SAVE5: "over $20" means **strictly more than $20.00**, on the subtotal before discounts, tax and tip. $20.00 doesn't qualify; $20.01 does.
+- **SAVE5 + ILOVEPIZZA: the code entered first stays; the second is rejected** with a message naming the code to remove. A held code that isn't currently eligible (SAVE5 at $20.00) still blocks the other, and the order can't be placed until one of them is removed or the cart qualifies.
+- On the running total, promo problems never break the total: each code gets a status and message. On submit and update, any code that would not apply is a 422, so an order is never stored with a code the customer may think applied.
+
+**Tip**
+- "Percentage of the total bill" = (subtotal − discounts + tax), not including the tip. A percent tip follows the bill; a dollar tip stays fixed and shows its effective rate, e.g. "$3.00 (10.96%)".
+- Up to two decimals; 0 allowed; caps of $500 and 100% catch typos. Tips are never taxed or discounted.
+
+**Orders and lifecycle**
+- The order id is a random GUID and acts as the customer's key to the order (no accounts).
+- "Cancelled" is added as a final status. Only the customer cancels, only while Not Started. The kitchen moves one step at a time and can't skip.
+- "Delivered" means handed to the customer (the spec rules out delivery integration).
+- What is submitted is exactly what Review showed. If prices changed in between, the order is refused with the new total (409) and nothing is created.
+- An order keeps a snapshot of its prices, names and tax; later menu, promo or tax changes never alter it. Changing an order while Not Started re-prices it at current prices, which the customer confirms on Review.
+- Retries: the same key replays the original response; the same key with a different body is refused (422). Keys last 24 hours.
+
+**Scope**
+- One restaurant is seeded, though the schema supports several (global menu plus per-store overrides). Prices are USD.
+- Whole toppings only. Half, quarter and extra toppings, crust/sauce upgrades and add-ons are designed, not built, and the API refuses them with a clear message. The default crust (hand tossed) and sauce (classic tomato) are free.
+- The cart lives in an in-memory session (2 hours idle): fine for one server, lost on restart.
+
+## Design write-up
+
+**Money and where pricing runs.** Money is `long` cents and rates are integer parts-per-million (6.5% = 65 000): no floating point anywhere. Rounding happens at six named points (topping per pizza, placement, item promo, order promo, tax, percent tip) through two named functions: `RoundHalfAwayFromZero` everywhere, and `Truncate` only for a tax jurisdiction configured to truncate. Amounts are rounded *before* they are multiplied (82.5¢ → 83¢ × 10 = $83.30, not $83.25), and discounts and tax are split across lines by largest remainder, so parts always sum to the total. **Pricing exists once, in `PizzaMagic.Domain`, and runs only in the order service.** The builder's running total is a `POST /quotes` (debounced, one request in flight, newest wins), and the browser only formats the server's numbers. Review seals the server's normalized order and total into a tamper-evident ticket; Place submits exactly that with `expectedTotalCents`, and the service refuses (409, with the new total) if prices changed. The total seen is the total charged by construction, not by keeping two implementations in step. The cost is a round trip per edit.
+
+**Adding a size, topping category or promo.** The menu is rows: a size is a `product` row, a topping category is a `topping_tier` row with a pricing rule, and stores override price or availability with sparse rows. A promo is a `promotion` row (effect kind + JSON parameters) with `promotion_condition`, `promotion_code` and conflict rows (`promotion_incompatibility` pairs, exclusion groups or "exclusive"). The engine looks kinds up by name and never mentions a product, tier or code. This script, as `data/seed/0002-*.sql`, adds a Party size and a "$10 off $50 or more" code that conflicts with both existing codes. After a restart, Pepperoni on a Party is $1.44 and SAVE5 after BIGTEN gets "SAVE5 can't be combined with BIGTEN…" (tried on a scratch database, no code changed):
+
+```sql
+INSERT INTO product (id, product_type_code, code, display_name, price_cents, tax_class_id, sort_order) VALUES (4,'PIZZA_SIZE','PARTY','Party',1800,1,4);
+INSERT INTO promotion (id, name, customer_description, effect_type, effect_params, priority, valid_from_local, valid_to_local)
+  VALUES (3,'Big Ten','$10 off orders of $50 or more','fixed_off_order','{"amountCents":1000}',100,NULL,NULL);
+INSERT INTO promotion_code (code, promotion_id) VALUES ('BIGTEN',3);
+INSERT INTO promotion_condition (id, promotion_id, condition_type, params) VALUES (2,3,'min_subtotal','{"amountCents":5000,"inclusive":true}');
+INSERT INTO promotion_incompatibility (promotion_id_low, promotion_id_high) VALUES (1,3), (2,3);
+```
+
+A new *kind* of rule (say "2+ pizzas") is one new `IConditionEvaluator` class registered by name; the engine and other promos are untouched. Product *types* are deliberately code, since they decide a line's shape. Startup validation refuses data the code can't honor rather than ignoring it.
+
+**The order lifecycle.** Not Started → Started → Ready for Pickup → Delivered, plus Cancelled from Not Started only; the allowed moves per actor are one table, tested for all 25 status pairs.
+- *Retry after a timeout.* Creating an order requires an `Idempotency-Key`. The builder's key stays the same while the cart's content does, and its HTTP client retries with the same key and identical bytes. The service stores the response with the key in the same transaction as the order, re-checking the key inside the write lock, so a retry of a committed request replays the original response and a parallel duplicate loses. If every attempt fails, the customer sees "We couldn't confirm your order", the cart is locked, and **Try again** re-sends the same ticket and key. **Guarantee:** one key, at most one order, the same answer every time (50 parallel retries; end to end with a lost response).
+- *Cancel as the kitchen starts.* Each is one conditional `UPDATE`: cancel `WHERE id = @id AND status = 'NotStarted'`, kitchen `WHERE id = @id AND status = @expected`. SQLite serializes writers, so exactly one changes the row; the other updates 0 rows, re-reads and says why (409 "the kitchen has started this order", with the time). Updates add `If-Match` on the version. **Guarantee:** exactly one wins and the loser is told accurately (50 runs, service and HTTP; a naive read-then-write version is shown to let both succeed).
+
+**Cut, faked, and next.** I chose to build the core path only (decision UQ7). Designed, not built: half/quarter/extra toppings, crust/sauce upgrades and add-ons, item promos and BOGO, multi-level tax with tax classes, a kitchen timer, Docker Compose. Faked: the kitchen is an unauthenticated endpoint; the cart is an in-memory session; the browser DOM code is checked by hand. Next, in order: placement pricing (its test vectors are written), upgrades and add-ons, item promos and BOGO, multi-level tax, then Compose and the timer; longer-term directions are in plan section 9.4. **Timebox:** this went far past 3 hours: planning on 2026-10-27/28, then build commits from 07:25 to 15:42 on 10-28 (about 8 hours, AI-assisted). In 3 hours I would keep the money model, quote-as-the-total, idempotent submit and conditional status updates, and drop the full schema, store overrides, time zones and most of the UI.
+
+## Tests and invariants
+
+**Chosen invariants, and why.** I tested the things a customer or the restaurant would lose money or trust over, and the things AI-written code tends to get subtly wrong:
+
+| Invariant | Why | Where |
+|---|---|---|
+| The total seen is the total charged: running total = Review = submitted = stored | Requirement 2; the core promise | `Quote_total_equals_submitted_total_equals_stored_total` for every spec example, the Checkout tests, and the end-to-end `Flow_build_submit_status_edit_cancel` and `Web_quote_equals_direct_api_quote` |
+| Exact money: spec examples to the cent, half away from zero, round before multiply | Rounding drift is the classic pricing bug | `Golden_vectors_price_to_the_cent` (P1–P26 and more), the `Monetary` tests, and property tests over 500 generated orders (discount and tax parts sum exactly, never negative) |
+| One source of truth for rounding and pricing | Keeps the first invariant true as code grows | Architecture scans: no floating point, no `Math.Round` and no bare price numbers in the engine; truncation only in `TaxCalculator`; the web app can't reference the pricing core or the database |
+| One key → at most one order | "Customers … may see timeouts and retry" | `Fifty_parallel_submissions_with_one_key_create_one_order`, replay, reused key with a different body, key expiry, `Transaction_is_immediate`, the client's retry-pipeline tests, and the end-to-end lost-response flow |
+| Cancel/update only while Not Started, even under races | Requirement 5's guarantee | All 25 status pairs per actor; `Cancel_and_kitchen_start_racing_exactly_one_wins` (and over HTTP), `Edit_and_kitchen_start_racing_never_edit_a_started_order`, and `Naive_check_then_act_double_succeeds` as the counter-example |
+| Promo rules as written: SAVE5 strictly over $20, the conflict message, codes re-evaluated on every edit | "We read this closely" | The `Promotions` tests (PR vectors) and quote/submit API tests |
+| A placed order never changes when the menu, promos or tax change | Seen = charged after the fact | `Historical_order_unchanged_after_price_rate_label_and_promo_change` |
+| Instants stored as UTC; promo windows in the restaurant's local time, correct across DST | Off-by-an-hour bugs | `Time` tests, DST promo-window vectors, `Every_time_column_is_utc_or_local_text` |
+| Bad data fails at startup, not at checkout | Data-only changes need a safety net | Startup validation tests |
+
+I checked that the important tests can fail by temporarily breaking the code (banker's rounding, swapped tax methods, a cancel without the status condition, a missing idempotency guard, a stray `Math.Round`). Each break failed the expected tests, and was then reverted. The log is in `docs/ai-log.md`.
+
+**Not covered:** the browser DOM wiring (`order-builder.js`, `order-details.js`) has no automated browser test (its logic modules do have `node --test` tests, and it was exercised by hand). There is nothing for multi-process deployment (the database's unique key is the backstop there, but untested across processes), load, session scale-out, or accessibility. The designed-not-built features have test vectors written in the plan but no tests. The planned "fantasy realm" test database (M15F) is not built.
+
+Test projects: `tests/PizzaMagic.Domain.Tests` (pricing core), `tests/PizzaMagic.OrderManager.Tests` (API and persistence against a real temp-file SQLite), `tests/PizzaMagic.Web.Tests` (order builder with a scripted order service), `tests/PizzaMagic.EndToEnd.Tests` (both real apps in-process, plus the architecture rules) and `tests/js` (`node --test`).
+
+## AI usage note
+
+Claude Code (Claude Opus 5.5) wrote most of the plan, the tests and the code under my direction: I made the design decisions (plan section 10) and the agent worked milestone by milestone, test first, keeping [docs/ai-log.md](docs/ai-log.md), a running log of the output that had to be fixed and of what was checked by hand. It was also used to research Washington's tax-rounding law. **Rejected:** I first asked for tax to always be truncated. Research during the session into RCW 82.08.054 showed that Washington requires half-up rounding on the combined tax, so I withdrew that decision and the rounding method became per-jurisdiction data. **Fixed AI output:** the first `EffectiveMenu` read the default crust and sauce before they were assigned, so the database's defaults would have been silently ignored. No test caught it (in the seed the default also sorts first), so `Global_default_wins_over_a_lower_sort_order` was added. **Verified rather than trusted:** the AI's tests were not taken at their word. Each key invariant was broken on purpose to confirm a test would fail. For "cancel and a kitchen start can never both succeed", removing the status condition from the cancel `UPDATE` failed exactly the three tests that cover it, and the condition was restored. `Naive_check_then_act_double_succeeds` stays in the suite to show the bug the design prevents. The log has the rest, including mistakes in AI-written tests.
+
+## Status and cut list
+
+Built test-first, milestone by milestone (plan section 8; red test commits, then the implementation): **M0–M16 are done.**
+
+| Milestone | What it adds |
+|---|---|
+| M0–M1 | Solution and package pins; money in integer cents, the two named rounding rules, exact splitting, `$` formatting |
+| M2–M6 | Menu with per-restaurant overrides and restaurant local time; promotion engine; Washington tax; pricing engine (validation, discounts, tax, tip with effective %); order description |
+| M7–M8 | Order state machine; full SQLite schema (33 tables), seed scripts and startup validation |
+| M9–M11 | Menu and quote API; idempotent submit with price check; update (If-Match), cancel, kitchen advance, race-proof status changes |
+| M12–M14 | The order builder: typed client with safe retries, builder page with a server-computed running total, Review/Place with a sealed ticket, order page with live status, change, cancel, recent orders, lookup |
+| M15 | End-to-end flows with both real apps, and architecture rules |
+| M16 | This README: API, assumptions, design write-up, tests, AI note |
+| M15F | Fantasy test database: **planned, not built** |
+
+The designed-not-built list and future directions are in [Design write-up](#design-write-up) above and in plan section 9.4.
+
+### Repository layout
 
 ```
-src/PizzaMagic.Domain/        pricing core (Monetary, Catalog, Pricing, Promotions, Tax, Time)
-src/PizzaMagic.Contracts/     shared contract types and formatters
-src/PizzaMagic.OrderManager/  order service (Web API)
-src/PizzaMagic.Web/           order builder (MVC)
-tests/                        one test project per app plus end-to-end tests
-tools/brand/                  logo and favicon generators
-docs/DEVELOPMENT_PLAN.md      design, decisions (section 10), milestones (section 8)
+src/PizzaMagic.Domain/        pricing core (Monetary, Catalog, Pricing, Promotions, Tax, Time, Ordering)
+src/PizzaMagic.Contracts/     shared request/response types and formatters
+src/PizzaMagic.OrderManager/  order service (Web API, EF Core + SQLite, seed runner)
+src/PizzaMagic.Web/           order builder (MVC, Session cart, typed client)
+data/seed/                    the menu, tax, promos and time zones, as SQL
+tests/                        one test project per app, end-to-end tests, JS tests
+tools/                        time zone seed generator, logo and favicon generators
+docs/DEVELOPMENT_PLAN.md      design, assumptions (section 3), decisions (section 10), milestones (section 8)
 docs/ai-log.md                running log of AI use, rejected output and hand verification
 ```
-
-## Still to come in this README
-
-The spec also asks for these sections. They are written in M16, when the pieces they describe exist:
-- **Order service API:** endpoints with example requests. The designed API is in plan section 5.
-- **Assumptions:** every ambiguity and the decision made. The current list is in plan section 3, and the user's decisions are in section 10.
-- **Design write-up:** money and rounding, extensibility, the order lifecycle and retries, and what was cut.
-- **AI usage note:** written from [docs/ai-log.md](docs/ai-log.md).
-- **Tested invariants:** which are covered and which are not (plan section 7.2).
