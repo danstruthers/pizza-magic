@@ -27,13 +27,39 @@ public sealed record DatabaseSelection(SeedProfile Profile, string ConnectionStr
     /// <summary><c>--database fantasy</c> is <c>Seed:Profile=fantasy</c>.</summary>
     public static IDictionary<string, string> SwitchMappings => new Dictionary<string, string> { ["--database"] = ProfileKey };
 
-    public static SeedProfile ParseProfile(string? value) => throw new NotImplementedException();
+    /// <summary>No value means the default database; anything other than default/fantasy (any case) is refused.</summary>
+    public static SeedProfile ParseProfile(string? value) => value?.ToUpperInvariant() switch
+    {
+        null => SeedProfile.Default,
+        "DEFAULT" => SeedProfile.Default,
+        "FANTASY" => SeedProfile.Fantasy,
+        _ => throw new DatabaseProfileException(
+            $"Unknown database '{value}'. Use --database default (pizzamagic.db, the normal data) or --database fantasy " +
+            "(pizzamagic-fantasy.db, the fantasy realm test data)."),
+    };
 
-    public static string FileName(SeedProfile profile) => throw new NotImplementedException();
+    public static string FileName(SeedProfile profile) => profile switch
+    {
+        SeedProfile.Default => "pizzamagic.db",
+        SeedProfile.Fantasy => "pizzamagic-fantasy.db",
+        _ => throw new ArgumentOutOfRangeException(nameof(profile)),
+    };
 
     /// <summary>The scripts a profile applies after data/seed/*.sql, relative to data/.</summary>
-    public static IReadOnlyList<string> ProfileScripts(SeedProfile profile) => throw new NotImplementedException();
+    public static IReadOnlyList<string> ProfileScripts(SeedProfile profile) => profile switch
+    {
+        SeedProfile.Default => [],
+        SeedProfile.Fantasy => [FantasyScript],
+        _ => throw new ArgumentOutOfRangeException(nameof(profile)),
+    };
 
     /// <summary>Resolves the profile and the connection string; the default file is in <paramref name="directory"/>.</summary>
-    public static DatabaseSelection Resolve(IConfiguration configuration, string directory) => throw new NotImplementedException();
+    public static DatabaseSelection Resolve(IConfiguration configuration, string directory)
+    {
+        var profile = ParseProfile(configuration[ProfileKey]);
+        var configured = configuration.GetConnectionString(ConnectionStringName);
+        return string.IsNullOrWhiteSpace(configured)
+            ? new DatabaseSelection(profile, $"Data Source={Path.Combine(directory, FileName(profile))};Default Timeout=5", IsExplicitConnectionString: false)
+            : new DatabaseSelection(profile, configured, IsExplicitConnectionString: true);
+    }
 }

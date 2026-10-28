@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using PizzaMagic.Domain.Catalog;
 using PizzaMagic.Domain.Pricing;
 using PizzaMagic.Domain.Promotions;
@@ -9,10 +11,12 @@ using PizzaMagic.OrderManager.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("PizzaMagic")
-    ?? throw new InvalidOperationException("Connection string 'PizzaMagic' is missing.");
+// M15F: --database default|fantasy (= Seed:Profile) picks the seed data and its file; both files sit side by side in
+// the working folder (pizzamagic.db, pizzamagic-fantasy.db). An explicit ConnectionStrings:PizzaMagic wins over the file.
+builder.Configuration.AddCommandLine(args, DatabaseSelection.SwitchMappings);
+var database = DatabaseSelection.Resolve(builder.Configuration, Environment.CurrentDirectory);
 
-builder.Services.AddDbContext<PizzaMagicDbContext>(options => options.UsePizzaMagicSqlite(connectionString));
+builder.Services.AddDbContext<PizzaMagicDbContext>(options => options.UsePizzaMagicSqlite(database.ConnectionString));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(PromotionRegistry.Default);
 builder.Services.AddSingleton(PricingMethodRegistry.Default);
@@ -60,12 +64,19 @@ var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var services = scope.ServiceProvider;
+    var db = services.GetRequiredService<PizzaMagicDbContext>();
+    app.Logger.LogInformation(
+        "Database profile {Profile}: {File}{Source}",
+        database.Profile,
+        Path.GetFullPath(new SqliteConnectionStringBuilder(db.Database.GetConnectionString()).DataSource),
+        database.IsExplicitConnectionString ? " (from ConnectionStrings:PizzaMagic)" : "");
     await DatabaseInitializer.InitializeAsync(
-        services.GetRequiredService<PizzaMagicDbContext>(),
+        db,
         Path.Combine(AppContext.BaseDirectory, "data"),
         services.GetRequiredService<TimeProvider>(),
         services.GetRequiredService<PromotionRegistry>(),
-        services.GetRequiredService<PricingMethodRegistry>());
+        services.GetRequiredService<PricingMethodRegistry>(),
+        database.Profile);
 }
 
 if (app.Environment.IsDevelopment())

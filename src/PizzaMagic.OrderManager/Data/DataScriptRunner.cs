@@ -22,17 +22,25 @@ public sealed class DataScriptChangedException(string message) : Exception(messa
 /// </summary>
 public sealed class DataScriptRunner(PizzaMagicDbContext db, TimeProvider clock)
 {
-    public Task<IReadOnlyList<DataScriptResult>> ApplyAsync(string dataDirectory, SeedProfile profile, CancellationToken cancellationToken = default) =>
-        profile == SeedProfile.Default ? ApplySeedsAsync(dataDirectory, cancellationToken) : throw new NotImplementedException();
+    public Task<IReadOnlyList<DataScriptResult>> ApplySeedsAsync(string dataDirectory, CancellationToken cancellationToken = default) =>
+        ApplyAsync(dataDirectory, SeedProfile.Default, cancellationToken);
 
-    public async Task<IReadOnlyList<DataScriptResult>> ApplySeedsAsync(string dataDirectory, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Applies data/seed/*.sql in name order, then the profile's own scripts (M15F: the fantasy realm). A database
+    /// belongs to one profile: the default profile refuses a database holding the fantasy realm, and the fantasy
+    /// profile refuses a database first seeded without it, so neither dataset is ever applied to the other's file.
+    /// </summary>
+    public async Task<IReadOnlyList<DataScriptResult>> ApplyAsync(string dataDirectory, SeedProfile profile, CancellationToken cancellationToken = default)
     {
         var scripts = Directory.GetFiles(Path.Combine(dataDirectory, "seed"), "*.sql")
             .Order(StringComparer.Ordinal)
-            .Select(path => (Name: "seed/" + Path.GetFileName(path), Path: path, Hash: Sha256(path)))
+            .Select(path => (Name: "seed/" + Path.GetFileName(path), Path: path))
+            .Concat(DatabaseSelection.ProfileScripts(profile).Select(name => (Name: name, Path: Path.Combine(dataDirectory, name))))
+            .Select(script => (script.Name, script.Path, Hash: Sha256(script.Path)))
             .ToList();
 
         var applied = await db.DataScriptLog.AsNoTracking().ToDictionaryAsync(l => l.Name, l => l.Sha256, cancellationToken);
+        CheckProfile(applied.Keys, profile);
         foreach (var script in scripts)
         {
             if (applied.TryGetValue(script.Name, out var hash) && hash != script.Hash)
@@ -53,6 +61,22 @@ public sealed class DataScriptRunner(PizzaMagicDbContext db, TimeProvider clock)
             results.Add(new DataScriptResult(script.Name, DataScriptOutcome.Applied));
         }
         return results;
+    }
+
+    private static void CheckProfile(IReadOnlyCollection<string> applied, SeedProfile profile)
+    {
+        var holdsFantasy = applied.Contains(DatabaseSelection.FantasyScript);
+        if (profile == SeedProfile.Default && holdsFantasy)
+        {
+            throw new DatabaseProfileException(
+                "This database holds the fantasy realm test data. Start with --database fantasy, or point ConnectionStrings:PizzaMagic at another file.");
+        }
+        if (profile == SeedProfile.Fantasy && applied.Count > 0 && !holdsFantasy)
+        {
+            throw new DatabaseProfileException(
+                "This database was created by the default profile; the fantasy realm needs its own file. Start without --database fantasy, " +
+                "or point ConnectionStrings:PizzaMagic at a new file.");
+        }
     }
 
     private async Task ApplyAsync(string name, string sql, string hash, CancellationToken cancellationToken)

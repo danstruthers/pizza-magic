@@ -84,6 +84,29 @@ public class FantasyRealmTests(FantasyRealmDatabase realm) : IClassFixture<Fanta
         (await new CatalogValidator(db, PromotionRegistry.Default, PricingMethodRegistry.Default, realm.Database.Clock).ValidateAsync()).ShouldBeEmpty();
     }
 
+    // The extended part of section 7.5 stays designed, not built: the validator still refuses its data on this
+    // database (A70), so it cannot be added to the realm until M4 EXT / X2 + UQ20 remove the matching rule.
+    [Theory]
+    [InlineData("multi-level tax (kingdom -> city)",
+        "INSERT INTO tax_jurisdiction (id, code, name, kind, parent_jurisdiction_id, default_rate_ppm) VALUES (1101, 'ELDORIA_CITY', 'Eldoria City', 'City', 1001, 12500); UPDATE restaurant SET tax_jurisdiction_id = 1101 WHERE id = 1001",
+        "which has a parent: multi-level tax is designed, not built (A70).")]
+    [InlineData("a POTION tax-class rate",
+        "INSERT INTO tax_class (id, code, name) VALUES (1001, 'POTION', 'Potion'); INSERT INTO jurisdiction_tax_class_rate VALUES (1001, 1001, 0)",
+        "per-class tax rates are designed, not built (A70).")]
+    [InlineData("a themed crust with an upcharge",
+        "INSERT INTO product (id, product_type_code, code, display_name, price_cents, tax_class_id) VALUES (1201, 'CRUST', 'DWARVEN_STONE_BAKED', 'Dwarven stone-baked', 150, 1)",
+        "Product DWARVEN_STONE_BAKED is a non-default crust or sauce: upgrades are designed, not built (A70).")]
+    public async Task Extended_part_is_still_refused(string feature, string sql, string error)
+    {
+        await using var database = await TestDatabase.CreateSeededAsync(SeedProfile.Fantasy);
+        await database.ExecuteAsync(sql);
+        await using var db = database.NewContext();
+
+        var errors = await new CatalogValidator(db, PromotionRegistry.Default, PricingMethodRegistry.Default, database.Clock).ValidateAsync();
+
+        errors.ShouldContain(e => e.EndsWith(error, StringComparison.Ordinal), feature);
+    }
+
     // ---- Time zones -----------------------------------------------------------------------------------------------
 
     [Theory]
