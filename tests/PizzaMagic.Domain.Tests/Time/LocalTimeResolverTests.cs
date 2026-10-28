@@ -4,7 +4,7 @@ namespace PizzaMagic.Domain.Tests.Time;
 
 public class LocalTimeResolverTests
 {
-    private static readonly TimeZonePeriods LosAngeles = LosAngelesZone.Periods();
+    private static readonly TimeZonePeriods LosAngeles = UsTimeZones.LosAngeles();
 
     private static LocalClock? ToLocal(string utc) =>
         LocalTimeResolver.ToLocal(LosAngeles, DateTimeOffset.Parse(utc, System.Globalization.CultureInfo.InvariantCulture));
@@ -72,5 +72,44 @@ public class LocalTimeResolverTests
 
         utc.ShouldBe(new LocalClock(Local(2026, 10, 27, 12, 0, 0), -420, "PDT", IsDst: true));
         sameInstant.ShouldBe(utc);
+    }
+
+    private static DateTimeOffset? Boundary(TimeZonePeriods zone, int year, int month, int day, int hour, int minute) =>
+        LocalTimeResolver.Boundary(zone, Local(year, month, day, hour, minute, 0));
+
+    private static DateTimeOffset Utc(string value) =>
+        DateTimeOffset.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+
+    // TZ11: a local boundary maps to the earliest UTC instant at which the local clock reads it (or later).
+    [Fact]
+    public void Boundary_normal_ambiguous_gap_and_other_zone()
+    {
+        Boundary(LosAngeles, 2026, 10, 28, 0, 0).ShouldBe(Utc("2026-10-28T07:00:00.000Z"));
+        Boundary(LosAngeles, 2026, 11, 1, 1, 30).ShouldBe(Utc("2026-11-01T08:30:00.000Z"));   // first occurrence (PDT)
+        Boundary(LosAngeles, 2026, 3, 8, 2, 30).ShouldBe(Utc("2026-03-08T10:00:00.000Z"));    // gap -> first instant after
+        Boundary(UsTimeZones.NewYork(), 2026, 12, 1, 0, 0).ShouldBe(Utc("2026-12-01T05:00:00.000Z"));
+    }
+
+    [Fact]
+    public void Boundary_outside_coverage_returns_none()
+    {
+        Boundary(LosAngeles, 2019, 12, 31, 12, 0).ShouldBeNull();
+        Boundary(LosAngeles, 2041, 1, 1, 0, 0).ShouldBeNull();
+        Boundary(LosAngeles, 2019, 12, 31, 16, 0).ShouldBe(Utc("2020-01-01T00:00:00.000Z"));  // exactly the first covered instant
+    }
+
+    [Fact]
+    public void Boundary_and_ToLocal_round_trip_on_ordinary_times()
+    {
+        var random = new Random(20261028);
+        for (var i = 0; i < 1000; i++)
+        {
+            var instant = new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero).AddMinutes(random.Next(0, 60 * 24 * 365 * 15));
+            var local = LocalTimeResolver.ToLocal(LosAngeles, instant)!;
+            var back = LocalTimeResolver.Boundary(LosAngeles, local.LocalTime)!.Value;
+
+            // Equal except in the repeated fall-back hour, where Boundary returns the earlier occurrence.
+            (back == instant || (back == instant.AddHours(-1) && !local.IsDst)).ShouldBeTrue($"{instant:O}");
+        }
     }
 }
