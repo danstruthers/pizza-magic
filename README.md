@@ -13,7 +13,7 @@ The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](
 
 ## Current status
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M12**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder's client for the order service is in place (M12); its screens come in M13-M14.
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M13**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder page (M13) builds an order with a running total that always comes from the order service; checkout and status pages come in M14.
 
 | Milestone | What it adds | Status |
 |---|---|---|
@@ -30,19 +30,20 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 | M10 | Order API: idempotent submit (Idempotency-Key, price check against the confirmed total), order / status / description from the stored snapshot | Done |
 | M11 | Update (If-Match) and cancel while Not Started, kitchen advance, and race-proof status changes (cancel vs kitchen start: exactly one wins) | Done |
 | M12 | The order builder's typed client for the order service: safe retries (same Idempotency-Key and body), no retry on 4xx, problems parsed, outages reported instead of thrown | Done |
-| M13-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Next |
+| M13 | Order builder page: pizzas, toppings, promo codes and tip, with a running total priced by the order service (never in the browser); the cart is kept in the session, and stale or out-of-order totals are ignored | Done |
+| M14-M15 | Checkout and review, order status pages, end-to-end tests | Next |
 | M15F | Fantasy realm test database: invented zones, restaurants, tiered taxes 0-75%, a MYTHIC topping tier, themed crusts and sauces | Planned |
 | M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
 
 **What you can look at today:**
 - **The pricing core, through its tests.** Every worked example in the plan (for instance P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = **$31.48**) is a test you can run (see below).
-- **The order builder** at http://localhost:5000: the branded welcome page (logo, favicon). The builder screens arrive in M13.
+- **The order builder** at http://localhost:5000 (start the order service too): add pizzas, toppings, promo codes and a tip, and watch the total update. "Review order" leads to checkout, which arrives in M14.
 - **The order service** at http://localhost:5100/swagger: on first start it creates and seeds `pizzamagic.db` and validates the catalog. Try the menu and price any order in Swagger, or with the ready-made requests in `src/PizzaMagic.OrderManager/PizzaMagic.OrderManager.http` (see "Try the API" below).
 
 ## Prerequisites
 
 - [.NET SDK 8.0.427](https://dotnet.microsoft.com/download/dotnet/8.0) or a later 8.0 feature band (pinned in `global.json`).
-- Optional: Node.js 18+ only to regenerate the logo and favicon (`tools/brand`).
+- Optional: Node.js 18+ to run the browser-script tests (`tests/js`) and to regenerate the logo and favicon (`tools/brand`).
 
 Nothing else: there is no database server to install. SQLite runs inside the order service from M8 onwards.
 
@@ -53,7 +54,10 @@ From the repository root:
 ```bash
 dotnet tool restore     # restores the pinned dotnet-ef tool
 dotnet test             # builds everything and runs all tests
+node --test "tests/js/*.test.mjs"   # the builder page's quote sequencing (needs Node.js)
 ```
+
+Node 22+ needs the quoted glob; a bare directory (`node --test tests/js`) is not accepted.
 
 Expected result today: about 1,900 tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
 
@@ -92,7 +96,10 @@ And in `tests/PizzaMagic.Web.Tests`:
 
 | Folder | Covers |
 |---|---|
+| `Builder` | The builder page rendered from the service's menu, the quote proxy (antiforgery required, newer drafts saved to the session cart, older ones ignored, promo list replaced by the server's normalized codes, field errors passed through, "Total unavailable — retrying" on an outage) |
 | `Clients` | The order builder's client behind its real retry pipeline: a 503 is retried with the same key and identical body, 4xx is never retried, problem types and fields are parsed, and outages come back as "unavailable" instead of exceptions |
+
+And in `tests/js/quote-sequencer.test.mjs`: edits are debounced, at most one quote is in flight and only the latest edit is sent after it, an older total never replaces a newer one, promo chips and field errors are shown by path, an outage keeps the last total greyed out, Review is enabled only when the server says the order can be submitted, and cents and percentages are formatted exactly as the server formats them.
 
 ## Run the apps
 

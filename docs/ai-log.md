@@ -101,3 +101,14 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 ## 2026-10-28: M12 typed client
 
 **Verified rather than trusted:** `Submit_retry_reuses_key_and_body` goes through the real `AddStandardResilienceHandler` pipeline with a stub as the network. It records three requests with one key and identical body bytes, so POST retries really happen (they are not silently disabled) and really are byte-identical. A scan confirms that `PizzaMagic.Web` references no Domain, EF Core or SQLite code.
+
+## 2026-10-28: M13 order builder page
+
+**Fixed AI output:**
+- The plan's JS test command `node --test tests/js` fails on Node 24, which treats a directory argument as a file. It is now `node --test "tests/js/*.test.mjs"`.
+- The template's `HomeController.Index` also claimed `/`, alongside the builder's `[HttpGet("/")]`. The home action and view were removed, Home keeps only the error page, and the nav points at the builder.
+
+**Verified rather than trusted:**
+- All 11 quote-sequencer tests fail against the `NotImplementedException` stub, and pass against the real module.
+- On the running pair: the page rendered the seed menu; the quote proxy returned the priced quote for 2 Large Pepperoni with ILOVEPIZZA; quantity 0 came back as 422 at `lineItems[0].quantity`; a post without the antiforgery header got 400; the session cart survived a reload; a stale draft (revision 1 after revision 2) did not overwrite it; `.mjs` is served as `text/javascript`.
+- Not covered by an automated test yet: the DOM wiring in `order-builder.js` (syntax-checked only). The M15 end-to-end tests are where it gets exercised in a browser.

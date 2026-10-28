@@ -1,0 +1,116 @@
+@model PizzaMagic.Web.Models.BuilderViewModel
+@{
+    ViewData["Title"] = "Build your order";
+    var menu = Model.Menu;
+}
+
+@if (menu is null)
+{
+    <div class="alert alert-warning" role="alert">
+        The menu is unavailable right now. <a href="/">Try again</a> in a moment.
+    </div>
+    return;
+}
+
+<div id="builder" data-menu="@Model.MenuJson" data-cart="@Model.CartJson">
+    @Html.AntiForgeryToken()
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <h1 class="h3">Build your order</h1>
+            <p class="text-muted">Choose a size and toppings for each pizza. Your total updates as you go.</p>
+
+            <div id="lines" class="d-flex flex-column gap-3"></div>
+            <button type="button" id="add-line" class="btn btn-outline-primary mt-3">+ Add a pizza</button>
+
+            <section class="mt-4">
+                <h2 class="h5">Promo codes</h2>
+                <div class="input-group" style="max-width: 24rem">
+                    <input id="promo-input" class="form-control" placeholder="e.g. ILOVEPIZZA" maxlength="32" autocomplete="off" aria-label="Promo code" />
+                    <button type="button" id="promo-apply" class="btn btn-outline-secondary">Apply</button>
+                </div>
+                <div id="promo-chips" class="d-flex flex-wrap gap-2 mt-2"></div>
+                <div id="promo-notices" class="small text-danger mt-1"></div>
+            </section>
+
+            <section class="mt-4">
+                <h2 class="h5">Tip</h2>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary tip-none">No tip</button>
+                    @foreach (var preset in menu.Policy.TipPresetsPpm)
+                    {
+                        <button type="button" class="btn btn-outline-secondary tip-preset" data-percent="@(preset / 10000m)">@BuilderViewModel.Percent(preset)</button>
+                    }
+                    <select id="tip-mode" class="form-select w-auto" aria-label="Tip type">
+                        <option value="Percent">%</option>
+                        <option value="Amount">$</option>
+                    </select>
+                    <input id="tip-value" class="form-control w-auto" inputmode="decimal" placeholder="Custom" aria-label="Tip value" size="8" />
+                </div>
+                <div class="small text-danger mt-1" data-error-for="tip.value"></div>
+            </section>
+        </div>
+
+        <aside class="col-lg-4">
+            <div id="total-panel" class="card shadow-sm position-sticky" style="top: 1rem">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Your order</h2>
+                    <div id="total-status" class="small text-muted mb-2">Add a pizza to see your total.</div>
+                    <dl class="row mb-0 small" id="totals">
+                        <dt class="col-6 fw-normal">Subtotal</dt><dd class="col-6 text-end" data-total="subtotal">—</dd>
+                        <dt class="col-6 fw-normal">Discounts</dt><dd class="col-6 text-end" data-total="discount">—</dd>
+                        <dt class="col-6 fw-normal">Tax</dt><dd class="col-6 text-end" data-total="tax">—</dd>
+                        <dt class="col-6 fw-normal">Tip</dt><dd class="col-6 text-end" data-total="tip">—</dd>
+                        <dt class="col-6 fs-5">Total</dt><dd class="col-6 text-end fs-5 fw-bold" data-total="total">—</dd>
+                    </dl>
+                    <div id="reasons" class="small text-warning-emphasis mt-2"></div>
+                    <a id="review" href="/Checkout" class="btn btn-primary w-100 mt-3 disabled" aria-disabled="true" disabled>Review order</a>
+                    <button type="button" id="describe" class="btn btn-link w-100 mt-1">Describe my order</button>
+                    <pre id="description" class="small bg-light p-2 mt-2 d-none" style="white-space: pre-wrap"></pre>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<template id="line-template">
+    <div class="card line">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-end">
+                <div>
+                    <label class="form-label small mb-0">Size</label>
+                    <select class="form-select size" data-field="sizeCode">
+                        @foreach (var size in menu.Sizes)
+                        {
+                            <option value="@size.Code">@size.Name — @BuilderViewModel.Money(size.PriceCents)</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-0">Quantity</label>
+                    <input type="number" class="form-control quantity" data-field="quantity" min="1" max="@menu.Policy.MaxLineQuantity" value="1" style="width: 6rem" />
+                </div>
+                <button type="button" class="btn btn-outline-danger ms-auto remove-line">Remove</button>
+            </div>
+            <div class="small text-danger line-errors"></div>
+            @foreach (var tier in menu.ToppingTiers)
+            {
+                <fieldset class="mt-3">
+                    <legend class="h6 mb-1">@tier.Name toppings</legend>
+                    <div class="d-flex flex-wrap gap-3">
+                        @foreach (var topping in tier.Toppings)
+                        {
+                            <label class="form-check-label">
+                                <input type="checkbox" class="form-check-input topping" value="@topping.Code" data-prices="@BuilderViewModel.WholePricesJson(topping)" />
+                                @topping.Name <span class="text-muted topping-price"></span>
+                            </label>
+                        }
+                    </div>
+                </fieldset>
+            }
+        </div>
+    </div>
+</template>
+
+@section Scripts {
+    <script type="module" src="~/js/order-builder.js" asp-append-version="true"></script>
+}

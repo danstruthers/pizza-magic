@@ -4,6 +4,7 @@ using PizzaMagic.Web.Models;
 
 namespace PizzaMagic.Web.Controllers;
 
+/// <summary>The error page. The home page is the order builder (<see cref="BuilderController"/>).</summary>
 public class HomeController : Controller
 {
     private readonly ILogger<HomeController> _logger;
@@ -11,11 +12,6 @@ public class HomeController : Controller
     public HomeController(ILogger<HomeController> logger)
     {
         _logger = logger;
-    }
-
-    public IActionResult Index()
-    {
-        return View();
     }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
