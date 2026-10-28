@@ -50,6 +50,7 @@ public static class EffectiveMenuBuilder
         }
 
         var globalDefaults = catalog.Products.Where(p => p.IsDefault).Select(p => p.Id).ToHashSet();
-        return new EffectiveMenu(overrides.RestaurantId, available, globalDefaults, tierRules);
+        var catalogTypes = catalog.Products.ToDictionary(p => p.Code, p => p.Type);
+        return new EffectiveMenu(overrides.RestaurantId, available, catalogTypes, globalDefaults, tierRules);
     }
 }

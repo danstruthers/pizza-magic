@@ -19,4 +19,8 @@ public sealed record CodeOutcome(
 /// Every code's outcome, the total discount, and the held codes (applied or not yet eligible) in entry
 /// order, which the builder keeps as its promo list.
 /// </summary>
-public sealed record PromotionResult(IReadOnlyList<CodeOutcome> Outcomes, Money TotalDiscount, IReadOnlyList<string> NormalizedPromoCodes);
+public sealed record PromotionResult(IReadOnlyList<CodeOutcome> Outcomes, Money TotalDiscount, IReadOnlyList<string> NormalizedPromoCodes)
+{
+    /// <summary>The applied outcomes in the order their effects were applied ((priority, id) order).</summary>
+    public IReadOnlyList<CodeOutcome> AppliedInOrder { get; init; } = [];
+}

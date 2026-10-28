@@ -112,21 +112,36 @@ public class PricingEngineTests
         (breakdown.Discount.Cents, breakdown.Total.Cents).ShouldBe((discount, total));
     }
 
-    // A dollar tip shows its effective percentage of the bill, the same base a percent tip uses (A18):
-    // P10: 300 / 2737 = 10.9609...% -> 109 609 ppm; it follows the bill when the cart changes.
+    // A dollar tip shows its effective percentage of the bill (the same base a percent tip uses, A18), in basis
+    // points rounded half away from zero, shown as "10.96%" (UQ22). It follows the bill when the cart changes.
     [Fact]
     public void Dollar_tip_reports_its_effective_rate_of_the_bill()
     {
         var p10 = Ok(Price(Draft([LargePepBacon(2)], Amount(300), "ILOVEPIZZA")));
         p10.Bill.ShouldBe(new Money(2737));
-        p10.TipEffectiveRatePpm.ShouldBe(109_609);
+        p10.TipEffectiveRateBasisPoints.ShouldBe(1096);    // 300 / 2737 = 10.9609...% -> 10.96%
 
         var smaller = Ok(Price(Draft([LargePepBacon(1)], Amount(300), "ILOVEPIZZA")));
-        smaller.TipEffectiveRatePpm.ShouldBe(219_138);   // 300 / 1369 = 21.9138...%
+        smaller.TipEffectiveRateBasisPoints.ShouldBe(2191);  // 300 / 1369 = 21.9138...% -> 21.91%
 
-        Ok(Price(Draft([LargePepBacon(2)], Percent(150_000)))).TipEffectiveRatePpm.ShouldBeNull();
-        Ok(Price(Draft([LargePepBacon(2)]))).TipEffectiveRatePpm.ShouldBeNull();
-        Ok(Price(Draft([], Amount(300)))).TipEffectiveRatePpm.ShouldBeNull();   // no bill to compare with
+        var midpoint = Ok(Price(Draft([Pizza("SMALL", 4)], Amount(1), "SAVE5")));
+        midpoint.Bill.ShouldBe(new Money(2130));
+        midpoint.TipEffectiveRateBasisPoints.ShouldBe(5);    // 1 / 2130 = 0.0469...% -> 0.05%
+
+        Ok(Price(Draft([LargePepBacon(2)], Percent(150_000)))).TipEffectiveRateBasisPoints.ShouldBeNull();
+        Ok(Price(Draft([LargePepBacon(2)]))).TipEffectiveRateBasisPoints.ShouldBeNull();
+        Ok(Price(Draft([], Amount(300)))).TipEffectiveRateBasisPoints.ShouldBeNull();   // no bill to compare with
+    }
+
+    [Theory]
+    [InlineData(1096, "10.96%")]
+    [InlineData(633, "6.33%")]
+    [InlineData(5, "0.05%")]
+    [InlineData(0, "0.00%")]
+    [InlineData(25_000, "250.00%")]
+    public void Effective_rate_formats_with_two_decimals(long basisPoints, string expected)
+    {
+        PizzaMagic.Contracts.PercentFormatter.FormatBasisPoints(basisPoints).ShouldBe(expected);
     }
 
     [Fact]
@@ -135,7 +150,7 @@ public class PricingEngineTests
         var without = Ok(Price(Draft([LargePepBacon(2)])));
         var with = Ok(Price(Draft([LargePepBacon(2)], Amount(10_000))));
 
-        with.Tax.ShouldBe(without.Tax);
+        with.Tax.ShouldBeEquivalentTo(without.Tax);
         with.Total.ShouldBe(without.Total + new Money(10_000));
     }
 

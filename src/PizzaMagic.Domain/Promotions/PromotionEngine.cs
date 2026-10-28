@@ -22,9 +22,13 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
         var passed = ApplyGates(normalized, catalog, context, outcomes);
         var held = ResolveConflicts(passed, catalog, outcomes);
         var eligible = CheckEligibility(held, context, outcomes);
-        var totalDiscount = ApplyEffects(eligible, context.GrossSubtotal, outcomes);
+        var appliedOrder = ApplyEffects(eligible, context.GrossSubtotal, outcomes);
+        var applied = appliedOrder.Select(i => outcomes[i]).ToList();
 
-        return new PromotionResult(outcomes, totalDiscount, held.Select(c => c.Code.Code!).ToList());
+        return new PromotionResult(outcomes, applied.Aggregate(Money.Zero, (sum, o) => sum + o.Discount), held.Select(c => c.Code.Code!).ToList())
+        {
+            AppliedInOrder = applied,
+        };
     }
 
     /// <summary>Steps 1-2: drop malformed, duplicate and over-limit codes, then apply the row-level gates.</summary>
@@ -95,9 +99,10 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
         return eligible;
     }
 
-    /// <summary>Step 5: effects, lower priority first, each on what remains. Returns the total discount.</summary>
-    private static Money ApplyEffects(List<Candidate> eligible, Money grossSubtotal, CodeOutcome[] outcomes)
+    /// <summary>Step 5: effects, lower priority first, each on what remains. Returns the applied outcome indexes in order.</summary>
+    private static List<int> ApplyEffects(List<Candidate> eligible, Money grossSubtotal, CodeOutcome[] outcomes)
     {
+        var appliedOrder = new List<int>();
         var remaining = grossSubtotal;
         foreach (var candidate in eligible.OrderBy(c => c.Promotion.Priority).ThenBy(c => c.Promotion.Id))
         {
@@ -117,8 +122,9 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
             remaining -= discount;
             var applied = new PromoMessage($"{code} saves {{discount}}.", new Dictionary<string, long> { ["discount"] = discount.Cents });
             outcomes[candidate.Index] = Outcome(candidate.Code, PromoStatus.Applied, applied, candidate.Promotion.Id) with { Discount = discount };
+            appliedOrder.Add(candidate.Index);
         }
-        return grossSubtotal - remaining;
+        return appliedOrder;
     }
 
     /// <summary>Row-level gates (step 2). Returns a terminal status, or the promotion and its parsed kinds.</summary>

@@ -11,16 +11,19 @@ namespace PizzaMagic.Domain.Catalog;
 public sealed class EffectiveMenu
 {
     private readonly Dictionary<(ProductType, string), EffectiveProduct> _available;
+    private readonly Dictionary<string, ProductType> _catalogTypes;
     private readonly Dictionary<long, (PricingRule Rule, IToppingPricingMethod Method)> _tierRules;
 
     internal EffectiveMenu(
         long restaurantId,
         IEnumerable<EffectiveProduct> available,
+        IReadOnlyDictionary<string, ProductType> catalogTypes,
         IReadOnlySet<long> globalDefaultIds,
         Dictionary<long, (PricingRule, IToppingPricingMethod)> tierRules)
     {
         RestaurantId = restaurantId;
         _available = available.ToDictionary(p => (p.Type, p.Code));
+        _catalogTypes = new Dictionary<string, ProductType>(catalogTypes, StringComparer.Ordinal);
         _tierRules = tierRules;
         DefaultCrust = DefaultOf(ProductType.Crust, globalDefaultIds);
         DefaultSauce = DefaultOf(ProductType.Sauce, globalDefaultIds);
@@ -36,6 +39,23 @@ public sealed class EffectiveMenu
 
     public bool TryGetAvailable(string code, ProductType type, [MaybeNullWhen(false)] out EffectiveProduct product) =>
         _available.TryGetValue((type, code), out product);
+
+    /// <summary>
+    /// Why a code can or cannot be ordered here as <paramref name="type"/>: available, in the catalog but not
+    /// sold here, a product of another type, or not in the catalog at all. Codes are catalog codes (upper case).
+    /// </summary>
+    public ProductLookup Lookup(string code, ProductType type, out EffectiveProduct? product)
+    {
+        if (_available.TryGetValue((type, code), out product))
+        {
+            return ProductLookup.Available;
+        }
+        if (!_catalogTypes.TryGetValue(code, out var catalogType))
+        {
+            return ProductLookup.Unknown;
+        }
+        return catalogType == type ? ProductLookup.Unavailable : ProductLookup.WrongType;
+    }
 
     /// <summary>Available products of one type, in display order.</summary>
     public IReadOnlyList<EffectiveProduct> Available(ProductType type) =>
