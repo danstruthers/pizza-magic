@@ -236,7 +236,7 @@ pizza-magic-2/
   global.json                       # SDK 8.0.427, rollForward latestFeature
   Directory.Build.props             # net8.0, Nullable, ImplicitUsings, TreatWarningsAsErrors
   Directory.Packages.props          # Central Package Management: every version pinned once
-  .config/dotnet-tools.json         # dotnet-ef 8.0.11
+  .config/dotnet-tools.json         # dotnet-ef 8.0.33
   .gitignore                        # + *.db, *.db-wal, *.db-shm, the spec .docx (kept out of history)
   docker-compose.yml  .dockerignore  README.md  PizzaMagic.OrderManager.http
   docs/DEVELOPMENT_PLAN.md  docs/ai-log.md (running AI log, M0..M16)  docs/design.md (if README gets long)
@@ -313,18 +313,20 @@ Marker types (`OrderManagerMarker`, `WebMarker`) stand in for `public partial cl
 
 | Concern | Choice (version) | Note |
 |---|---|---|
-| ORM / DB | `Microsoft.EntityFrameworkCore.Sqlite` 8.0.11, `Microsoft.EntityFrameworkCore.Design` 8.0.11, local tool `dotnet-ef` 8.0.11 | Migrations carry the **schema only**. Data is in SQL scripts (§2.12). |
+| ORM / DB | `Microsoft.EntityFrameworkCore.Sqlite` 8.0.33, `Microsoft.EntityFrameworkCore.Design` 8.0.33, local tool `dotnet-ef` 8.0.33 | Migrations carry the **schema only**. Data is in SQL scripts (§2.12). |
 | Naming | `EFCore.NamingConventions` 8.0.3 → `UseSnakeCaseNamingConvention()` for columns, plus **explicit `ToTable("customer_order")`** etc. for every table | Avoids plural table names derived from DbSet names. A test asserts the table names against `sqlite_master`. |
 | HTTP resilience (Web) | `Microsoft.Extensions.Http.Resilience` 8.10.0 (`AddStandardResilienceHandler`) | POST/PUT retries are allowed **because** every mutation is idempotent (§2.11). |
 | Time | `TimeProvider` (built into .NET 8). Tests use `Microsoft.Extensions.TimeProvider.Testing` 8.10.0 (`FakeTimeProvider`). | Day-of-week promos, timestamps, simulator. |
 | Time zones | **No runtime tz library and no OS tz data.** Offsets come from the `time_zone_offset_period` table (UQ15), resolved by the pure `LocalTimeResolver`. `NodaTime` 3.1.11 (embedded tzdb) is used **only at dev time**, by `tools/PizzaMagic.TzSeedGen` and the seed-verification test. | DST-correct, deterministic, and identical on Windows and Linux. A source scan forbids `TimeZoneInfo` and NodaTime in `src/`. |
 | Errors | `AddProblemDetails()`, RFC 9457 `application/problem+json` | Stable `type` URIs that the MVC app switches on. |
 | API docs | `Swashbuckle.AspNetCore` 6.6.2 at `/swagger` in Development, plus a `.http` file | Swagger doubles as the "kitchen console". |
-| Tests | xunit 2.9.2, xunit.runner.visualstudio 2.8.2, Microsoft.NET.Test.Sdk 17.11.1, **Shouldly** 4.2.1, `Microsoft.AspNetCore.Mvc.Testing` 8.0.11 | FluentAssertions v8 has a commercial license, so it is avoided. FsCheck is [STRETCH]. |
+| Tests | xunit 2.9.3, xunit.runner.visualstudio 2.8.2, Microsoft.NET.Test.Sdk 17.11.1, **Shouldly** 4.2.1, `Microsoft.AspNetCore.Mvc.Testing` 8.0.33 | FluentAssertions v8 has a commercial license, so it is avoided. FsCheck is [STRETCH]. |
 | JS tests | Node's built-in `node --test` (Node 24 is present on the dev machine; no npm packages) | Covers the one piece of JS with real behavior: quote sequencing (§6.3). |
 | Browser E2E | None (documented cut) | The JS only renders server values. |
 
 At M0 these are known-good pins. If a newer 8.0.x / 8.x patch is available on the feed, M0 bumps the pin **once**, in `Directory.Packages.props`, and records it.
+
+**M0 pin bump (2026-10-28, recorded once):** EF Core Sqlite/Design, `Microsoft.AspNetCore.Mvc.Testing` and `dotnet-ef` 8.0.11 → 8.0.33; xunit 2.9.2 → 2.9.3. The other pins were already the latest patch on their line, or newer releases only exist on a later major/minor line (e.g. Shouldly 4.3.0, Swashbuckle 8.x), so they stay as planned.
 
 ### 1.4 Scaffold commands (M0)
 
@@ -332,7 +334,7 @@ At M0 these are known-good pins. If a newer 8.0.x / 8.x patch is available on th
 dotnet new globaljson --sdk-version 8.0.427 --roll-forward latestFeature
 dotnet new sln -n PizzaMagic
 dotnet new tool-manifest
-dotnet tool install dotnet-ef --version 8.0.11
+dotnet tool install dotnet-ef --version 8.0.33
 dotnet new classlib -n PizzaMagic.Domain        -o src/PizzaMagic.Domain        -f net8.0
 dotnet new classlib -n PizzaMagic.Contracts     -o src/PizzaMagic.Contracts     -f net8.0
 dotnet new webapi   -n PizzaMagic.OrderManager  -o src/PizzaMagic.OrderManager  -f net8.0 --use-controllers --no-https
