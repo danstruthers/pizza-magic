@@ -1,0 +1,61 @@
+@model PizzaMagic.Web.Models.KitchenViewModel
+@{
+    ViewData["Title"] = "Kitchen";
+}
+
+@* Simple auto-refresh so new orders appear; each button still sends the status it was drawn with. *@
+<meta http-equiv="refresh" content="15" />
+
+<div class="d-flex flex-wrap align-items-baseline gap-3">
+    <h1 class="h3 mb-0">Kitchen</h1>
+    <span class="small text-muted">Simulated restaurant side: move each order on one step at a time. Refreshes every 15 seconds.</span>
+    <a href="/Kitchen" class="btn btn-sm btn-outline-secondary ms-auto">Refresh now</a>
+</div>
+
+@if (Model.Notice is not null)
+{
+    <div class="alert alert-info mt-3" role="status">@Model.Notice</div>
+}
+
+@if (Model.Orders is null)
+{
+    <div class="alert alert-warning mt-3" role="alert">@Model.Unavailable</div>
+}
+else if (Model.Orders.Count == 0)
+{
+    <p class="text-muted mt-4">No orders waiting.</p>
+}
+else
+{
+    <p class="small text-muted mt-3 mb-2">@Model.Orders.Count active @(Model.Orders.Count == 1 ? "order" : "orders"), oldest first.</p>
+    <div class="d-flex flex-column gap-3" style="max-width: 48rem">
+        @foreach (var order in Model.Orders)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="badge @Display.StatusBadge(order.Status)">@order.StatusDisplay</span>
+                        <span class="font-monospace small" title="@order.OrderId">@order.OrderId</span>
+                        <span class="small text-muted">placed @Display.Time(order.CreatedAtLocal, order.CreatedAt)</span>
+                        @if (order.CustomerName is not null)
+                        {
+                            <span class="small">for <strong>@order.CustomerName</strong></span>
+                        }
+                        <span class="ms-auto fw-bold">@Display.Money(order.TotalCents)</span>
+                    </div>
+                    <ul class="mt-2 mb-3">
+                        @foreach (var item in order.Items)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                    <form method="post" action="/Kitchen/@order.OrderId/Advance">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="expectedStatus" value="@order.Status" />
+                        <button type="submit" class="btn btn-primary">@KitchenViewModel.ActionLabel(order.NextStatus)</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+}

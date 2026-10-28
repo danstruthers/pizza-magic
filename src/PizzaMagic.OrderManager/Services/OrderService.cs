@@ -333,6 +333,45 @@ public sealed partial class OrderService(
             .SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
 
+    /// <summary>
+    /// The kitchen queue: a restaurant's orders that are not yet Delivered or Cancelled, oldest first (ties by id).
+    /// Throws <see cref="RestaurantNotFoundException"/> for an unknown restaurant (or no default one).
+    /// </summary>
+    public async Task<KitchenQueueResponse> KitchenQueueAsync(long? restaurantId, CancellationToken cancellationToken = default)
+    {
+        var restaurant = restaurantId is { } requested
+            ? await db.Restaurants.AsNoTracking().SingleOrDefaultAsync(r => r.Id == requested, cancellationToken)
+            : await db.Restaurants.AsNoTracking().SingleOrDefaultAsync(r => r.IsDefault, cancellationToken);
+        if (restaurant is null)
+        {
+            throw new RestaurantNotFoundException(restaurantId is null ? "There is no default restaurant." : $"Restaurant {restaurantId} does not exist.");
+        }
+
+        var active = Enum.GetValues<OrderStatus>().Where(s => !OrderStateMachine.IsTerminal(s)).Select(s => s.ToString()).ToList();
+        var orders = await db.Orders.AsNoTrackingWithIdentityResolution()
+            .Where(o => o.RestaurantId == restaurant.Id && active.Contains(o.Status))
+            .Include(o => o.Lines).ThenInclude(l => l.Toppings)
+            .Include(o => o.Promotions)
+            .Include(o => o.TaxLines)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        var zone = await loader.LoadZoneAsync(restaurant.TimeZoneId, cancellationToken);
+        var queue = orders
+            .OrderBy(o => o.CreatedAtUtc).ThenBy(o => o.Id, StringComparer.Ordinal)
+            .Select(order =>
+            {
+                var view = OrderView.ToResponse(order, zone);
+                var next = OrderStateMachine.NextKitchenStatus(Enum.Parse<OrderStatus>(order.Status))!.Value;
+                return new KitchenOrderResponse(
+                    view.OrderId, view.Status, view.StatusDisplay, view.Version, view.CreatedAt, view.CreatedAtLocal, view.CustomerName,
+                    view.Pricing.LineItems.Select(l => l.Description).ToList(), view.Pricing.TotalCents,
+                    next.ToString(), OrderStateMachine.DisplayName(next));
+            })
+            .ToList();
+        return new KitchenQueueResponse(restaurant.Id, queue);
+    }
+
     public Task<TimeZonePeriods> ZoneAsync(CustomerOrderEntity order, CancellationToken cancellationToken = default) =>
         loader.LoadZoneAsync(order.TimeZoneId, cancellationToken);
 

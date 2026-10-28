@@ -49,10 +49,13 @@ public sealed class OrderManagerClient(IHttpClientFactory factory) : IOrderManag
         SendAsync<OrderResponse>(ClientName, HttpMethod.Post, $"/api/v1/orders/{orderId}/cancel", null, null, cancellationToken);
 
     public Task<ApiResult<KitchenQueueResponse>> GetKitchenQueueAsync(long? restaurantId, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();   // red stub
+        SendAsync<KitchenQueueResponse>(ClientName, HttpMethod.Get,
+            restaurantId is { } id ? $"/api/v1/kitchen/orders?restaurantId={id}" : "/api/v1/kitchen/orders", null, null, cancellationToken);
 
+    // Safe to retry: a repeat with the same expected status is answered with alreadyApplied, never a second step.
     public Task<ApiResult<AdvanceOrderResponse>> AdvanceAsync(Guid orderId, string expectedStatus, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();   // red stub
+        SendAsync<AdvanceOrderResponse>(ClientName, HttpMethod.Post, $"/api/v1/kitchen/orders/{orderId}/advance",
+            new AdvanceOrderRequest(expectedStatus), null, cancellationToken);
 
     private async Task<ApiResult<T>> SendAsync<T>(
         string clientName, HttpMethod method, string path, object? body, Action<HttpRequestMessage>? headers, CancellationToken cancellationToken)

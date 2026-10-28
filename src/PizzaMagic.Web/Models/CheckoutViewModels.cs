@@ -37,6 +37,19 @@ public sealed record RecentOrdersViewModel(IReadOnlyList<RecentOrderRow> Orders,
 /// <summary>One recent order: the order as the service returned it, or why it couldn't be read (<see cref="Problem"/>).</summary>
 public sealed record RecentOrderRow(Guid OrderId, OrderResponse? Order, string? Problem);
 
+/// <summary>The kitchen page: the active orders (null when the service is unavailable), a one-time notice, and the outage message.</summary>
+public sealed record KitchenViewModel(IReadOnlyList<KitchenOrderResponse>? Orders, string? Notice, string? Unavailable)
+{
+    /// <summary>The button for an order's next step.</summary>
+    public static string ActionLabel(string nextStatus) => nextStatus switch
+    {
+        "Started" => "Start",
+        "ReadyForPickup" => "Mark ready for pickup",
+        "Delivered" => "Mark delivered",
+        _ => $"Move to {Display.StatusName(nextStatus)}",
+    };
+}
+
 /// <summary>A page that only says something (order not found, service unavailable).</summary>
 public sealed record MessageViewModel(string Title, string Text);
 
@@ -57,6 +70,14 @@ public static class Display
             : DateTime.TryParse(utc, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var instant)
                 ? $"{instant.ToString("MMM d, yyyy, h:mm tt", CultureInfo.InvariantCulture)} UTC"
                 : utc;
+
+    /// <summary>A status code as people read it: "NotStarted" → "Not Started", "ReadyForPickup" → "Ready for Pickup".</summary>
+    public static string StatusName(string status) => status switch
+    {
+        "NotStarted" => "Not Started",
+        "ReadyForPickup" => "Ready for Pickup",
+        _ => status,
+    };
 
     /// <summary>A status badge colour for the order lists: grey, amber, blue, green, or dark when cancelled.</summary>
     public static string StatusBadge(string status) => status switch

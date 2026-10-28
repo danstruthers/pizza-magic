@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using PizzaMagic.Contracts.Api;
 using PizzaMagic.Domain.Ordering;
 using PizzaMagic.OrderManager.Api;
+using PizzaMagic.OrderManager.Data;
 using PizzaMagic.OrderManager.Services;
 
 namespace PizzaMagic.OrderManager.Controllers;
@@ -18,8 +19,18 @@ public sealed class KitchenController(OrderService orders) : ControllerBase
     [HttpGet]
     [ProducesResponseType<KitchenQueueResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public Task<IActionResult> Queue([FromQuery] long? restaurantId, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();   // red stub
+    public async Task<IActionResult> Queue([FromQuery] long? restaurantId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await orders.KitchenQueueAsync(restaurantId, cancellationToken));
+        }
+        catch (RestaurantNotFoundException)
+        {
+            return Problems.Of(ProblemTypes.RestaurantNotFound, StatusCodes.Status404NotFound, "Restaurant not found.",
+                $"Restaurant {restaurantId} doesn't exist.");
+        }
+    }
 
 
     [HttpPost("{orderId:guid}/advance")]

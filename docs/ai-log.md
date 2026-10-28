@@ -173,3 +173,11 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 **Process note:** a running copy of the web app (not started by the agent) locked `bin/`, so the tests were built with `--artifacts-path` into a temp folder instead of stopping it. That made the architecture tests fail (they found the repository by walking up from their output folder); `Repository` now falls back to its own source file's location, which is a real robustness fix, not a test change to make things pass.
 
 **Verified rather than trusted:** red first (2 tests), then all 2,082 .NET tests green; in headless Edge against the new build on spare ports with a scratch database: two orders placed, one started by the kitchen, and the page showed "Started | Placed Oct 28, 2026, 4:37 PM PDT | $13.34 | 1 x Large pizza with Pepperoni 2x | ILOVEPIZZA −$1.39" and "Not Started | … | $5.91 | 1 x Small pizza with Bacon".
+
+## 2026-10-28: simulated kitchen page (UQ30)
+
+**Requested by the user:** a restaurant page in the web app that shows all pending orders with a button to advance each. The order service had no way to list orders, so `GET /api/v1/kitchen/orders` (a stretch item in the plan) was built for it; the web app still reaches orders only through the service.
+
+**Fixed AI output:** `git add -A` picked up the background agent's worktree folder (`.claude/worktrees/...`) and committed it as an embedded repository in the red commit. It was removed from the (unpushed) commit with `git rm --cached` and an amend, and `.claude/worktrees/` was added to `.gitignore`; the agent's files were not touched.
+
+**Verified rather than trusted:** red first (13 tests across the API, client, page and end-to-end), then all 2,095 .NET tests green. Removing the active-status filter from the queue query fails the queue test (a delivered order has no next step), and was reverted. In headless Edge against the new build on spare ports with a scratch database: two orders placed, both listed oldest first with items and totals; pressing the first order's button three times took it to Delivered ("Order 0569f436 is now Delivered.") and off the list.
