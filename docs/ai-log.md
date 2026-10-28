@@ -126,3 +126,17 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - All 28 new C# tests and 4 new JS tests failed against the stubs before the implementation.
 - On the running pair: the P9 order (2 Large Pepperoni + Bacon, ILOVEPIZZA, 15% tip) reviewed and placed at $31.48; it appeared under "Your orders"; Change loaded it into the builder, and updating it to one Medium Pepperoni gave $8.05 (version 2); after a kitchen advance the status endpoint showed Started, the page dropped its buttons, and cancel showed the kitchen message; lookup by number redirected to the order.
 - Not covered by an automated test: the DOM wiring in `order-details.js` and `order-builder.js` (syntax-checked only); M15's end-to-end tests exercise them.
+
+## 2026-10-28: M15 end-to-end and architecture tests
+
+**Found by the new tests:** the engine literal scan flagged `PromotionDefinition`'s default priority, a bare `100` (the schema's column default). It is now the named constant `PromotionDefinition.DefaultPriority` (committed separately as `fix:` after the test).
+
+**Fixed AI output:**
+- The first version of the scan's self-test put C# with three quotes in a row inside a `"""` raw string, which didn't compile; it now uses a four-quote delimiter.
+- A first attempt to plant a forbidden project reference (to check the dependency test) used shell `sed`/`node` escaping that silently didn't change the file, so the test "passed" against an unchanged project. The plant was redone with an exact edit and confirmed in the file before trusting the result.
+
+**Verified rather than trusted (each plant reverted, tree confirmed clean):**
+- A planted `Rounding.Truncate(x, 7) + (long)Math.Round(1.5)` in `TipCalculator` fails all three rounding scans (Truncate outside TaxCalculator; `Math.Round` and the literals 7 and 1.5 in the engine; library rounding in `src/`).
+- A planted `ProjectReference` from Web to Domain fails `Web_does_not_reference_Domain_or_EF`.
+- The scanner's own test checks that numbers and `Math.Round` inside comments, regular, verbatim and character literals are ignored while real code is not, and that line numbers survive.
+- The lost-response flow checks the database directly: one order after the lost response, still one after Try again.

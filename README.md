@@ -13,7 +13,7 @@ The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](
 
 ## Current status
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M14**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder (M13-M14) builds an order with a running total that always comes from the order service, reviews and places it, and then shows its status, with change and cancel while the kitchen hasn't started it.
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M15**: the whole pricing core, the order description, the order state machine, the database, and the complete order service API: menu, quotes, idempotent submission, reads, update and cancel while Not Started, and the kitchen advancing orders. The order builder (M13-M14) builds an order with a running total that always comes from the order service, reviews and places it, and then shows its status, with change and cancel while the kitchen hasn't started it. End-to-end tests (M15) run both apps together and check the architecture rules.
 
 | Milestone | What it adds | Status |
 |---|---|---|
@@ -32,9 +32,9 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 | M12 | The order builder's typed client for the order service: safe retries (same Idempotency-Key and body), no retry on 4xx, problems parsed, outages reported instead of thrown | Done |
 | M13 | Order builder page: pizzas, toppings, promo codes and tip, with a running total priced by the order service (never in the browser); the cart is kept in the session, and stale or out-of-order totals are ignored | Done |
 | M14 | Review and place (what Review shows is exactly what is submitted), order page with live status, change and cancel, recent orders and lookup, a safe "Try again" after a lost connection | Done |
-| M15 | End-to-end and architecture tests | Next |
+| M15 | End-to-end tests (both real apps, in-process: build, place, change, cancel, kitchen start, a lost response then Try again, an outage) and architecture rules (who may reference whom, no pricing literals or library rounding in the engine, truncation only for the TRUNCATE tax method) | Done |
 | M15F | Fantasy realm test database: invented zones, restaurants, tiered taxes 0-75%, a MYTHIC topping tier, themed crusts and sauces | Planned |
-| M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
+| M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Next |
 
 **What you can look at today:**
 - **The pricing core, through its tests.** Every worked example in the plan (for instance P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = **$31.48**) is a test you can run (see below).
@@ -60,7 +60,7 @@ node --test "tests/js/*.test.mjs"   # the builder page's quote sequencing (needs
 
 Node 22+ needs the quoted glob; a bare directory (`node --test tests/js`) is not accepted.
 
-Expected result today: about 1,900 tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
+Expected result today: about 2,060 .NET tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
 
 Useful variations:
 
@@ -101,6 +101,13 @@ And in `tests/PizzaMagic.Web.Tests`:
 | `Checkout` | Review and Place: the sealed review ticket (what Review showed is exactly what is submitted, never the live cart), normalized promo codes and defaults, Place disabled when the order can't be submitted, a tampered or expired ticket refused, "Prices changed" with the new total, field errors, and after a lost connection a locked cart with a safe "Try again" that reuses the same key |
 | `OrderPages` | The order page from its snapshot, buttons that follow the order's allowed actions, the status polling endpoint, change through Review (update with If-Match; 412 and 409 handled), cancel, start over, recent orders and lookup |
 | `Clients` | The order builder's client behind its real retry pipeline: a 503 is retried with the same key and identical body, 4xx is never retried, problem types and fields are parsed, and outages come back as "unavailable" instead of exceptions |
+
+And in `tests/PizzaMagic.EndToEnd.Tests` (the real order builder talking to the real order service, both in-process, on a temp SQLite database; only the network between them is simulated):
+
+| Folder | Covers |
+|---|---|
+| `Flows` | The builder's total equals the API's quote; the promo conflict message; build, review, place, status, change and cancel with the same total on every page and in the database; the kitchen starts the order and cancel is refused; the order service commits an order but the response is lost, and Try again returns the same order (exactly one in the database); the order service is down, then back |
+| `Architecture` | Domain and Contracts reference nothing; the order builder references only Contracts (never Domain, EF Core or SQLite); no runtime time zone library or `TimeZoneInfo` in `src/`; no pricing literals, floating point or library rounding in the pricing engine; `Truncate` used only by the TRUNCATE tax method |
 
 And in `tests/js/order-status.test.mjs`: the order page polls every 5 seconds, stops at Delivered or Cancelled, and keeps going after a failed request.
 
