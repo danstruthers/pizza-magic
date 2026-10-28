@@ -37,3 +37,11 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - Comparing the promo end against the local wall clock instead of the resolved UTC boundary fails exactly 2 tests: the 09:00Z and 09:15Z cases on the fall-back night, where the naive comparison re-opens an expired promo. This is the flicker the design exists to prevent (PR13b).
 
 **Fixed AI output:** two of the first-draft tests were wrong before the first run. One zero-discount test assumed the wrong application order: equal priorities fall back to promotion id, so ILOVEPIZZA (id 1) applied first. The other test, described as "dropped codes block nothing", actually tested the code limit. Both were rewritten before committing the red tests.
+
+## 2026-10-28: M4 single-level tax
+
+**Verified rather than trusted:**
+- Swapping the HALF_UP and TRUNCATE branches in `TaxCalculator` fails 6 tests (T1-T3 and T13).
+- A source scan confirms that `Rounding.Truncate` is called only from `TaxCalculator` (outside its own definition).
+
+**Process note:** for the second time (also in M1), the automatic restore after a mutation check used `git checkout` on a not-yet-committed file, which silently did nothing. The mutation was restored by hand and verified. From now on, mutations are made and reverted with explicit edits.
