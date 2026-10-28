@@ -249,7 +249,8 @@ pizza-magic-2/
     examples/tuesday20.sql  bogo-pizza.sql  second-restaurant.sql  city-jurisdiction.sql
   src/
     PizzaMagic.Domain/              # pure: no EF, no ASP.NET, no clock, no I/O, no formatting, no decimal
-      Money/       Money.cs, Rate.cs, Rounding.cs, LargestRemainder.cs
+      Monetary/    Money.cs, Rate.cs, Rounding.cs, LargestRemainder.cs   (namespace PizzaMagic.Domain.Monetary, so a
+                   `Money` type never sits inside a `Money` namespace)
       Catalog/     CatalogSnapshot.cs, RestaurantOverrides.cs, EffectiveMenuBuilder.cs, EffectiveMenu.cs,
                    ProductType.cs, EffectiveProduct.cs, ToppingPrice.cs, Portion.cs, PortionMask.cs,
                    PlacementNormalizer.cs, CoverageCounts.cs, CheapestCover.cs, CoveragePhrase.cs,
