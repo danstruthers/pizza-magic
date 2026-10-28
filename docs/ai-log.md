@@ -25,3 +25,7 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 ## 2026-10-28: M1 money primitives
 
 **Verified rather than trusted:** after the money tests passed, `RoundHalfAwayFromZero` was temporarily mutated so that exact halves round down (banker's-style), to confirm that the tests can fail. 5 tests failed (the midpoint and 6.5%-of-$5.00 cases), and the mutation was then reverted. The tie-break rules of the largest-remainder allocator were also hand-checked against plan vectors M5–M9.
+
+## 2026-10-28: M2 catalog, line pricing, local time
+
+**Fixed AI output:** the first draft of `EffectiveMenu` computed the default crust and sauce in its constructor from a set of default ids that was only assigned by an `init` property afterwards. The global `is_default` flags would therefore have been silently ignored, and the fallback (lowest sort order) would have hidden the bug with the seed data. It was caught on review before the first build, and the ids became a constructor argument. The `Default_crust_falls_back_to_the_lowest_sort_order_available_here` test only covers the fallback, so the seed-default case is covered by `Default_crust_and_sauce_are_the_seed_defaults`.
