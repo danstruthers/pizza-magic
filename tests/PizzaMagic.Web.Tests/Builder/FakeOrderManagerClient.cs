@@ -61,6 +61,24 @@ public sealed class FakeOrderManagerClient : IOrderManagerClient
         CancelRequests.Add(orderId);
         return Task.FromResult(Cancel(orderId));
     }
+
+    public Func<long?, ApiResult<KitchenQueueResponse>> KitchenQueue { get; set; } =
+        _ => ApiResult<KitchenQueueResponse>.Success(new KitchenQueueResponse(1, [SampleOrders.Queued()]), null, false);
+
+    public Func<Guid, string, ApiResult<AdvanceOrderResponse>> Advance { get; set; } =
+        (id, expected) => ApiResult<AdvanceOrderResponse>.Success(
+            new AdvanceOrderResponse(id.ToString(), expected, "Started", 2, false, [], ""), null, false);
+
+    public List<(Guid Id, string ExpectedStatus)> AdvanceRequests { get; } = [];
+
+    public Task<ApiResult<KitchenQueueResponse>> GetKitchenQueueAsync(long? restaurantId, CancellationToken cancellationToken) =>
+        Task.FromResult(KitchenQueue(restaurantId));
+
+    public Task<ApiResult<AdvanceOrderResponse>> AdvanceAsync(Guid orderId, string expectedStatus, CancellationToken cancellationToken)
+    {
+        AdvanceRequests.Add((orderId, expectedStatus));
+        return Task.FromResult(Advance(orderId, expectedStatus));
+    }
 }
 
 public static class Menus
@@ -130,6 +148,11 @@ public static class SampleOrders
         new OrderPricingResponse([LargePepperoni], 1296, [], 0, 1296, new TaxRoundingResponse("HALF_UP", "COMBINED"), [], 84, 1380,
             new TipResponse("None", null, null, 0, null), 1380),
         "1 x Large pizza with Pepperoni\nTax: $0.84\nTotal: $13.80");
+
+    /// <summary>The sample order as the kitchen queue lists it.</summary>
+    public static KitchenOrderResponse Queued(string status = "NotStarted", string next = "Started", string nextDisplay = "Started", Guid? id = null) => new(
+        (id ?? Id).ToString(), status, Display(status), 1, "2026-10-28T19:00:00.000Z", new LocalTimeResponse("2026-10-28T12:00:00", -420, "PDT"),
+        "Dana", ["1 x Large pizza with Pepperoni 2x", "2 x Small pizza (no toppings)"], 1380, next, nextDisplay);
 
     public static OrderStatusResponse Status(string status = "Started", int version = 2, Guid? id = null) => new(
         (id ?? Id).ToString(), status, Display(status), version, "2026-10-28T19:05:00.000Z",

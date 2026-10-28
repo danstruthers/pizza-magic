@@ -27,6 +27,26 @@ public sealed record UpdateOrderRequest(
 /// <summary>POST /api/v1/kitchen/orders/{id}/advance: the status the kitchen believes the order is in (required).</summary>
 public sealed record AdvanceOrderRequest(string? ExpectedStatus);
 
+/// <summary>GET /api/v1/kitchen/orders: one restaurant's active orders (not yet Delivered or Cancelled), oldest first.</summary>
+public sealed record KitchenQueueResponse(long RestaurantId, IReadOnlyList<KitchenOrderResponse> Orders);
+
+/// <summary>
+/// One active order as the kitchen sees it: what to make (one description per line), when it was placed, and the
+/// status it moves to next (send <c>Status</c> as <c>expectedStatus</c> to advance it).
+/// </summary>
+public sealed record KitchenOrderResponse(
+    string OrderId,
+    string Status,
+    string StatusDisplay,
+    int Version,
+    string CreatedAt,
+    LocalTimeResponse? CreatedAtLocal,
+    string? CustomerName,
+    IReadOnlyList<string> Items,
+    long TotalCents,
+    string NextStatus,
+    string NextStatusDisplay);
+
 /// <summary>
 /// The kitchen's result: the new status, whether the call was a repeat (alreadyApplied), and the content the kitchen
 /// committed to, read in the same transaction as the status change.

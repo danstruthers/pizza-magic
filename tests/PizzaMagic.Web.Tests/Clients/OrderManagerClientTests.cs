@@ -187,6 +187,30 @@ public class OrderManagerClientTests
     }
 
     [Fact]
+    public async Task Kitchen_routes_and_body()
+    {
+        var stub = new StubHandler(
+            Respond(HttpStatusCode.OK, """{ "restaurantId": 2, "orders": [] }"""),
+            Respond(HttpStatusCode.OK, """{ "restaurantId": 1, "orders": [] }"""),
+            Respond(HttpStatusCode.OK, $$"""{ "orderId": "{{OrderId}}", "previousStatus": "NotStarted", "status": "Started", "version": 2, "alreadyApplied": false, "lineItems": [], "description": "" }"""));
+        var client = ClientFor(stub);
+
+        var queue = await client.GetKitchenQueueAsync(2, CancellationToken.None);
+        await client.GetKitchenQueueAsync(null, CancellationToken.None);
+        var advanced = await client.AdvanceAsync(OrderId, "NotStarted", CancellationToken.None);
+
+        queue.Value!.RestaurantId.ShouldBe(2);
+        advanced.Value!.Status.ShouldBe("Started");
+        stub.Requests.Select(r => (r.Method.Method, r.PathAndQuery)).ShouldBe(
+        [
+            ("GET", "/api/v1/kitchen/orders?restaurantId=2"),
+            ("GET", "/api/v1/kitchen/orders"),
+            ("POST", $"/api/v1/kitchen/orders/{OrderId}/advance"),
+        ]);
+        stub.Requests[2].Body.ShouldBe("""{"expectedStatus":"NotStarted"}""");
+    }
+
+    [Fact]
     public async Task Caller_cancellation_is_not_unavailable()
     {
         using var cancelled = new CancellationTokenSource();

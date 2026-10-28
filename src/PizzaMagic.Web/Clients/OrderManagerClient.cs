@@ -48,6 +48,12 @@ public sealed class OrderManagerClient(IHttpClientFactory factory) : IOrderManag
     public Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, CancellationToken cancellationToken) =>
         SendAsync<OrderResponse>(ClientName, HttpMethod.Post, $"/api/v1/orders/{orderId}/cancel", null, null, cancellationToken);
 
+    public Task<ApiResult<KitchenQueueResponse>> GetKitchenQueueAsync(long? restaurantId, CancellationToken cancellationToken) =>
+        throw new NotImplementedException();   // red stub
+
+    public Task<ApiResult<AdvanceOrderResponse>> AdvanceAsync(Guid orderId, string expectedStatus, CancellationToken cancellationToken) =>
+        throw new NotImplementedException();   // red stub
+
     private async Task<ApiResult<T>> SendAsync<T>(
         string clientName, HttpMethod method, string path, object? body, Action<HttpRequestMessage>? headers, CancellationToken cancellationToken)
     {

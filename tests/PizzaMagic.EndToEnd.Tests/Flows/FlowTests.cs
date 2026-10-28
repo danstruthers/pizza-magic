@@ -193,6 +193,31 @@ public class FlowTests
         edit.Headers.Location!.OriginalString.ShouldBe($"/Orders/{id}");
     }
 
+    // The simulated kitchen page moves a real order through every step; the customer's page follows it.
+    [Fact]
+    public async Task Kitchen_page_moves_an_order_to_delivered()
+    {
+        await using var orderManager = new OrderManagerHost();
+        await using var web = new WebHost(orderManager);
+        var (browser, token) = await OpenBuilderAsync(web);
+        var id = await PlaceAsync(web, browser, token, P9(1));
+        var kitchen = web.Browser();
+
+        foreach (var (expected, now) in new[] { ("NotStarted", "Started"), ("Started", "Ready for Pickup"), ("ReadyForPickup", "Delivered") })
+        {
+            var page = await kitchen.GetStringAsync("/Kitchen");
+            page.ShouldContain($"action=\"/Kitchen/{id}/Advance\"");
+            page.ShouldContain($"name=\"expectedStatus\" value=\"{expected}\"");
+            var pressed = await WebHost.PostFormAsync(kitchen, $"/Kitchen/{id}/Advance", WebHost.Token(page), ("expectedStatus", expected));
+            pressed.Headers.Location!.OriginalString.ShouldBe("/Kitchen");
+            WebHost.Text(await kitchen.GetStringAsync("/Kitchen")).ShouldContain($"is now {now}.");
+        }
+
+        (await kitchen.GetStringAsync("/Kitchen")).ShouldNotContain($"/Kitchen/{id}/Advance");   // delivered: off the list
+        (await ApiOrderAsync(orderManager, id)).Status.ShouldBe("Delivered");
+        WebHost.Text(await browser.GetStringAsync($"/Orders/{id}")).ShouldContain("Delivered");
+    }
+
     // The order service commits the order but every response is lost (a phone losing signal). The customer sees "We
     // couldn't confirm" and presses Try again: the same key replays the order, so exactly one exists.
     [Fact]

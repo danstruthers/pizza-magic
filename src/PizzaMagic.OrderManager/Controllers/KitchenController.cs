@@ -14,6 +14,14 @@ namespace PizzaMagic.OrderManager.Controllers;
 [Route("api/v1/kitchen/orders")]
 public sealed class KitchenController(OrderService orders) : ControllerBase
 {
+    /// <summary>The restaurant's active orders, oldest first (default restaurant when <paramref name="restaurantId"/> is omitted).</summary>
+    [HttpGet]
+    [ProducesResponseType<KitchenQueueResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<IActionResult> Queue([FromQuery] long? restaurantId, CancellationToken cancellationToken) =>
+        throw new NotImplementedException();   // red stub
+
+
     [HttpPost("{orderId:guid}/advance")]
     [ProducesResponseType<AdvanceOrderResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]

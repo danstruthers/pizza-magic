@@ -23,4 +23,10 @@ public interface IOrderManagerClient
     Task<ApiResult<OrderResponse>> UpdateAsync(Guid orderId, int version, UpdateOrderRequest request, string idempotencyKey, CancellationToken cancellationToken);
 
     Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, CancellationToken cancellationToken);
+
+    /// <summary>The restaurant side: active orders, oldest first (the simulated kitchen page).</summary>
+    Task<ApiResult<KitchenQueueResponse>> GetKitchenQueueAsync(long? restaurantId, CancellationToken cancellationToken);
+
+    /// <summary>Moves an order one step on, if it is still in <paramref name="expectedStatus"/> (a repeat is safe: alreadyApplied).</summary>
+    Task<ApiResult<AdvanceOrderResponse>> AdvanceAsync(Guid orderId, string expectedStatus, CancellationToken cancellationToken);
 }

@@ -63,3 +63,6 @@ Senior_Software_Developer_*.docx
 *.db
 *.db-wal
 *.db-shm
+
+# Agent worktrees (local only)
+.claude/worktrees/
