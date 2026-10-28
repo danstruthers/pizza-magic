@@ -5,18 +5,49 @@
 
 <h1 class="h3">Your orders</h1>
 
-@if (Model.OrderIds.Count == 0)
+@if (Model.Orders.Count == 0)
 {
     <p class="text-muted">No recent orders in this browser.</p>
 }
 else
 {
-    <ul class="list-group mb-4" style="max-width: 32rem">
-        @foreach (var id in Model.OrderIds)
+    <p class="small text-muted">Orders placed in this browser in the last 7 days, newest first. Statuses are as of when this page loaded.</p>
+    <div class="d-flex flex-column gap-3 mb-4" style="max-width: 40rem">
+        @foreach (var row in Model.Orders)
         {
-            <li class="list-group-item"><a href="/Orders/@id" class="font-monospace">@id</a></li>
+            var order = row.Order;
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        @if (order is not null)
+                        {
+                            <span class="badge @Display.StatusBadge(order.Status)">@order.StatusDisplay</span>
+                            <span class="small text-muted">Placed @Display.DateAndTime(order.CreatedAtLocal, order.CreatedAt)</span>
+                            <span class="ms-auto fw-bold">@Display.Money(order.Pricing.TotalCents)</span>
+                        }
+                        else
+                        {
+                            <span class="small text-muted">@row.Problem</span>
+                        }
+                    </div>
+                    @if (order is not null)
+                    {
+                        <ul class="list-unstyled small mt-2 mb-2">
+                            @foreach (var line in order.Pricing.LineItems)
+                            {
+                                <li>@line.Description</li>
+                            }
+                            @foreach (var promo in order.Pricing.Promotions.Where(p => p.DiscountCents > 0))
+                            {
+                                <li class="text-success">@promo.Code −@Display.Money(promo.DiscountCents)</li>
+                            }
+                        </ul>
+                    }
+                    <a href="/Orders/@row.OrderId" class="small font-monospace">@row.OrderId</a>
+                </div>
+            </div>
         }
-    </ul>
+    </div>
 }
 
 <h2 class="h5 mt-4">Find an order</h2>

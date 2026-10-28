@@ -98,18 +98,34 @@ public sealed class OrdersController(IOrderManagerClient orderManager, RecentOrd
     }
 
     [HttpGet("/Orders")]
-    public IActionResult Recent() => View(new RecentOrdersViewModel(recentOrders.Read(Request), null));
+    public async Task<IActionResult> Recent() => View(new RecentOrdersViewModel(await RecentAsync(), null));
 
     /// <summary>Opens an order by its number, e.g. one placed on another device.</summary>
     [HttpGet("/Orders/Lookup")]
-    public IActionResult Lookup(string? orderId)
+    public async Task<IActionResult> Lookup(string? orderId)
     {
         if (Guid.TryParse(orderId?.Trim(), out var id))
         {
             return Redirect($"/Orders/{id}");
         }
         var message = string.IsNullOrWhiteSpace(orderId) ? null : InvalidNumber;
-        return View(nameof(Recent), new RecentOrdersViewModel(recentOrders.Read(Request), message));
+        return View(nameof(Recent), new RecentOrdersViewModel(await RecentAsync(), message));
+    }
+
+    /// <summary>
+    /// The cookie's orders (at most 10) read from the service in parallel, newest first. An order that can't be read is
+    /// still listed, with a short reason, so one failure never hides the others.
+    /// </summary>
+    private async Task<IReadOnlyList<RecentOrderRow>> RecentAsync()
+    {
+        var reads = recentOrders.Read(Request).Select(async id =>
+        {
+            var result = await orderManager.GetOrderAsync(id, HttpContext.RequestAborted);
+            return result.IsSuccess
+                ? new RecentOrderRow(id, result.Value, null)
+                : new RecentOrderRow(id, null, result.Problem?.Type == ProblemTypes.OrderNotFound ? "Order not found." : "Details unavailable right now.");
+        });
+        return await Task.WhenAll(reads);
     }
 
     private ViewResult Message(int status, string title, string text)

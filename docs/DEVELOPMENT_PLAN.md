@@ -2342,7 +2342,7 @@ The front end is the `PizzaMagic.Web` project.
 | `POST /Orders/{id}/Edit` (antiforgery) | `OrdersController.Edit` | Load the order into the Session cart with `EditingOrderId`/`EditingVersion`, then go to the builder (reuses it). Review/Place then perform the update. **Built as POST** (it changes the Session; a GET could be triggered by a prefetch or a link). Refused while an order is waiting for confirmation. |
 | `POST /Builder/StartOver` (antiforgery) | `BuilderController.StartOver` | Empty the cart and leave edit mode (built in M14; refused while an order is waiting for confirmation, which only Try again can resolve). |
 | `POST /Orders/{id}/Cancel` | `OrdersController.Cancel` | Confirm, then `CancelAsync` |
-| `GET /Orders` / `GET /Orders/Lookup` | `OrdersController.Recent/Lookup` | Recent orders from a data-protected cookie (≤ 10 ids, 7 days). Paste-an-id lookup for other devices. [STRETCH-able, cut #5] |
+| `GET /Orders` / `GET /Orders/Lookup` | `OrdersController.Recent/Lookup` | Recent orders from a data-protected cookie (≤ 10 ids, 7 days), each read from the service in parallel and shown with its status, placed date and time (restaurant local), line descriptions, discounts and total (user request, 2026-10-28); an order that can't be read stays listed with "Order not found." or "Details unavailable right now.". Paste-an-id lookup for other devices. |
 
 **View models:**
 - `BuilderViewModel(MenuDto Menu, CartState Cart)`

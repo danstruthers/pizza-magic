@@ -44,7 +44,7 @@ The build treats warnings as errors. To list the spec's worked pricing examples 
 ## Using it
 
 1. Open http://localhost:5000. Add pizzas (size, quantity, toppings, each as Regular, Extra 2x or Triple 3x), promo codes and a tip (preset %, custom % or dollars). The total updates as you go; each promo code is listed with what it saves (or why it doesn't apply yet) and a Remove button, and "Describe my order" shows the written description. Review stays disabled until the current total allows the order to be placed.
-2. **Review order** prices the order again and shows exactly what will be charged. **Place order** sends it and opens the order's page (save the link; "Your orders" also lists it).
+2. **Review order** prices the order again and shows exactly what will be charged. **Place order** sends it and opens the order's page (save the link). **Your orders** lists every order placed in this browser in the last 7 days, newest first, with its status, when it was placed (restaurant time), what's on it, its discounts and its total.
 3. While the order is Not Started, **Change order** (back through the builder and Review) and **Cancel order** are available. The page polls the status every 5 seconds.
 4. **Simulate the kitchen** (the restaurant side): advance an order one step at a time, sending the status you expect it to be in:
 

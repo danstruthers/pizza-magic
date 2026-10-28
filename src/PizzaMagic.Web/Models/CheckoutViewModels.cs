@@ -31,8 +31,11 @@ public sealed record OrderDetailsViewModel(OrderResponse Order, string? Notice)
     public bool CanCancel => Order.AllowedActions.Contains("cancel");
 }
 
-/// <summary>Recent orders from the cookie, plus the lookup form's message.</summary>
-public sealed record RecentOrdersViewModel(IReadOnlyList<Guid> OrderIds, string? LookupMessage);
+/// <summary>Recent orders from the cookie (newest first), each with its stored order, plus the lookup form's message.</summary>
+public sealed record RecentOrdersViewModel(IReadOnlyList<RecentOrderRow> Orders, string? LookupMessage);
+
+/// <summary>One recent order: the order as the service returned it, or why it couldn't be read (<see cref="Problem"/>).</summary>
+public sealed record RecentOrderRow(Guid OrderId, OrderResponse? Order, string? Problem);
 
 /// <summary>A page that only says something (order not found, service unavailable).</summary>
 public sealed record MessageViewModel(string Title, string Text);
@@ -46,6 +49,24 @@ public static class Display
         tip.EffectiveRateBasisPoints is { } basisPoints
             ? $"{Money(tip.TipCents)} ({PercentFormatter.FormatBasisPoints(basisPoints)})"
             : Money(tip.TipCents);
+
+    /// <summary>"Oct 28, 2026, 12:00 PM PDT" in the restaurant's zone, or in UTC when the service had no local time.</summary>
+    public static string DateAndTime(LocalTimeResponse? local, string utc) =>
+        local is not null && DateTime.TryParse(local.LocalTime, CultureInfo.InvariantCulture, DateTimeStyles.None, out var wallClock)
+            ? $"{wallClock.ToString("MMM d, yyyy, h:mm tt", CultureInfo.InvariantCulture)} {local.Abbreviation}"
+            : DateTime.TryParse(utc, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var instant)
+                ? $"{instant.ToString("MMM d, yyyy, h:mm tt", CultureInfo.InvariantCulture)} UTC"
+                : utc;
+
+    /// <summary>A status badge colour for the order lists: grey, amber, blue, green, or dark when cancelled.</summary>
+    public static string StatusBadge(string status) => status switch
+    {
+        "Started" => "text-bg-warning",
+        "ReadyForPickup" => "text-bg-info",
+        "Delivered" => "text-bg-success",
+        "Cancelled" => "text-bg-dark",
+        _ => "text-bg-secondary",
+    };
 
     /// <summary>"12:05 PM PDT" in the restaurant's zone, or the UTC time when the service had no local time.</summary>
     public static string Time(LocalTimeResponse? local, string utc) =>

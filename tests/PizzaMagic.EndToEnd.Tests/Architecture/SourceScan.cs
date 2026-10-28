@@ -2,24 +2,31 @@ using System.Text;
 
 namespace PizzaMagic.EndToEnd.Tests.Architecture;
 
-/// <summary>The repository root (the folder holding PizzaMagic.sln), found from the test's output folder.</summary>
+/// <summary>
+/// The repository root (the folder holding PizzaMagic.sln), found from the test's output folder or, when the build
+/// output lives elsewhere (<c>--artifacts-path</c>), from this source file's location.
+/// </summary>
 public static class Repository
 {
-    public static readonly string Root = Find();
+    public static readonly string Root = Find(AppContext.BaseDirectory) ?? Find(SourceDirectory())
+        ?? throw new InvalidOperationException("PizzaMagic.sln not found above " + AppContext.BaseDirectory + " or " + SourceDirectory());
 
     public static string Relative(string path) => Path.GetRelativePath(Root, path).Replace('\\', '/');
 
-    private static string Find()
+    private static string? Find(string start)
     {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        for (var directory = new DirectoryInfo(start); directory is not null; directory = directory.Parent)
         {
             if (File.Exists(Path.Combine(directory.FullName, "PizzaMagic.sln")))
             {
                 return directory.FullName;
             }
         }
-        throw new InvalidOperationException("PizzaMagic.sln not found above " + AppContext.BaseDirectory);
+        return null;
     }
+
+    private static string SourceDirectory([System.Runtime.CompilerServices.CallerFilePath] string file = "") =>
+        Path.GetDirectoryName(file) ?? "";
 }
 
 /// <summary>
