@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" width="280" height="64" role="img" aria-label="Pizza Magic!">
+  <title>Pizza Magic!</title>
+  <g>
+    <circle cx="29" cy="35" r="27" fill="#B5651D"/>
+    <circle cx="29" cy="35" r="25" fill="#E8A23B"/>
+    <circle cx="29" cy="35" r="20.5" fill="#FFD15C"/>
+    <g fill="#C0392B">
+      <circle cx="20" cy="29" r="5"/>
+      <circle cx="35" cy="26" r="5"/>
+      <circle cx="27" cy="44" r="5"/>
+      <circle cx="40" cy="39" r="4.5"/>
+    </g>
+    <polygon points="52,0 54.26,9.74 64,12 54.26,14.26 52,24 49.74,14.26 40,12 49.74,9.74" fill="#7B3FBF"/>
+    <polygon points="59,22.5 60.13,26.87 64.5,28 60.13,29.13 59,33.5 57.87,29.13 53.5,28 57.87,26.87" fill="#7B3FBF"/>
+    <polygon points="43,0.5 43.85,3.65 47,4.5 43.85,5.35 43,8.5 42.15,5.35 39,4.5 42.15,3.65" fill="#A66BE0"/>
+  </g>
+  <text x="72" y="44" font-family="'Trebuchet MS', 'Segoe UI', Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="0.5">
+    <tspan fill="#C0392B">Pizza</tspan>
+    <tspan fill="#7B3FBF">Magic!</tspan>
+  </text>
+</svg>
