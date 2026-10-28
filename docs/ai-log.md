@@ -45,3 +45,11 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - A source scan confirms that `Rounding.Truncate` is called only from `TaxCalculator` (outside its own definition).
 
 **Process note:** for the second time (also in M1), the automatic restore after a mutation check used `git checkout` on a not-yet-committed file, which silently did nothing. The mutation was restored by hand and verified. From now on, mutations are made and reverted with explicit edits.
+
+## 2026-10-28: M5-M6 pricing engine and description
+
+**Fixed AI output:**
+- `Tip_is_not_taxed` first compared two `TaxResult` records with `ShouldBe`. Record equality compares the `Lines` list by reference, so identical tax results were reported as different. It now uses `ShouldBeEquivalentTo`.
+- The first `PercentFormatter.FormatBasisPointsCompact` trimmed trailing zeros with a chain of string replacements that was hard to verify and risky for values like 10%, where removing "0%" breaks the number. It was replaced before any commit with integer-based formatting, and 10% and 10.05% test cases were added.
+
+**Verified rather than trusted:** the effective-tip-rate examples (10.96%, 21.91% and the 0.05% half-up case) were recomputed independently with a script before being written into the tests.

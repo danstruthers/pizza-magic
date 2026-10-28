@@ -149,6 +149,8 @@ public class PricingEngineTests
     [InlineData(1500, "15%")]
     [InlineData(1750, "17.5%")]
     [InlineData(1825, "18.25%")]
+    [InlineData(1000, "10%")]
+    [InlineData(1005, "10.05%")]
     [InlineData(0, "0%")]
     public void Entered_rate_formats_without_trailing_zeros(long basisPoints, string expected)
     {
