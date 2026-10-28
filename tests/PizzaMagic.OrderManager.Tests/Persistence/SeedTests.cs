@@ -42,7 +42,12 @@ public class SeedTests
         catalog.Chain.ShouldBe([new JurisdictionNode(1, "WA", "Washington State", null, 65_000, TaxRoundingMethod.HalfUp, TaxRoundingScope.Combined)]);
         catalog.Zone.IanaId.ShouldBe("America/Los_Angeles");
         catalog.Zone.Periods.Count.ShouldBe(43);
-        catalog.Policy.ShouldBe(new OrderingPolicy(20, 20, 12, 3, 50_000, 1_000_000));
+        var policy = catalog.Policy;
+        (policy.MaxLines, policy.MaxLineQuantity, policy.MaxToppingsPerPizza, policy.MaxPromoCodes, policy.MaxTipAmountCents, policy.MaxTipPercentPpm)
+            .ShouldBe((20, 20, 12, 3, 50_000L, 1_000_000));
+        policy.TipPresetsPpm.ShouldBe([150_000, 180_000, 200_000]);
+        catalog.Restaurant.ShouldBe(new RestaurantInfo(1, "MAIN", "Pizza Magic", true));
+        catalog.TaxClassCodes[1].ShouldBe("PREPARED_FOOD");
 
         (await database.ScalarAsync("SELECT COUNT(*) AS Value FROM product WHERE product_type_code = 'TOPPING' AND max_multiplier = 3 AND tax_class_id = 1")).ShouldBe(12);
         (await database.ScalarAsync("SELECT COUNT(*) AS Value FROM portion_type WHERE (code, price_factor_ppm) IN (VALUES ('WHOLE', 1000000), ('HALF', 600000), ('QUARTER', 400000))")).ShouldBe(3);

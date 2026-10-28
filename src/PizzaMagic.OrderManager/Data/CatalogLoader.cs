@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PizzaMagic.Domain.Catalog;
 using PizzaMagic.Domain.Pricing;
@@ -24,16 +25,17 @@ public sealed class CatalogLoader(PizzaMagicDbContext db, PricingMethodRegistry?
             : await db.Restaurants.AsNoTracking().SingleOrDefaultAsync(r => r.IsDefault, cancellationToken);
         if (restaurant is null)
         {
-            throw new InvalidOperationException(restaurantId is null ? "There is no default restaurant." : $"Restaurant {restaurantId} does not exist.");
+            throw new RestaurantNotFoundException(restaurantId is null ? "There is no default restaurant." : $"Restaurant {restaurantId} does not exist.");
         }
 
+        var taxClasses = await db.TaxClasses.AsNoTracking().ToListAsync(cancellationToken);
         var snapshot = new CatalogSnapshot(
             (await db.Products.AsNoTracking().ToListAsync(cancellationToken)).Select(ToRow).ToList(),
             (await db.ToppingTiers.AsNoTracking().ToListAsync(cancellationToken))
                 .Select(t => new ToppingTierRow(t.Id, t.Code, t.DisplayName, new PricingRule(t.PricingMethod, t.RatePpm, t.AmountCents), t.SortOrder, t.IsActive))
                 .ToList(),
             (await db.ProductCategories.AsNoTracking().ToListAsync(cancellationToken)).Select(c => new ProductCategoryRow(c.Id, c.Code, c.IsActive)).ToList(),
-            (await db.TaxClasses.AsNoTracking().ToListAsync(cancellationToken)).Select(c => new TaxClassRow(c.Id, c.Code, c.IsActive)).ToList());
+            taxClasses.Select(c => new TaxClassRow(c.Id, c.Code, c.IsActive)).ToList());
 
         var overrides = new RestaurantOverrides(
             restaurant.Id,
@@ -50,8 +52,15 @@ public sealed class CatalogLoader(PizzaMagicDbContext db, PricingMethodRegistry?
             EffectiveMenuBuilder.Build(snapshot, overrides, _pricingMethods),
             await LoadPromotionsAsync(cancellationToken),
             JurisdictionChainResolver.Resolve(jurisdictions, restaurant.TaxJurisdictionId),
-            new OrderingPolicy(policy.MaxLines, policy.MaxLineQuantity, policy.MaxToppingsPerPizza, policy.MaxPromoCodes, policy.MaxTipAmountCents, policy.MaxTipPercentPpm),
-            await LoadZoneAsync(restaurant.TimeZoneId, cancellationToken));
+            new OrderingPolicy(policy.MaxLines, policy.MaxLineQuantity, policy.MaxToppingsPerPizza, policy.MaxPromoCodes, policy.MaxTipAmountCents, policy.MaxTipPercentPpm)
+            {
+                TipPresetsPpm = JsonSerializer.Deserialize<List<int>>(policy.TipPresetsPpm) ?? [],
+            },
+            await LoadZoneAsync(restaurant.TimeZoneId, cancellationToken))
+        {
+            Restaurant = new RestaurantInfo(restaurant.Id, restaurant.Code, restaurant.Name, restaurant.IsActive),
+            TaxClassCodes = taxClasses.ToDictionary(c => c.Id, c => c.Code),
+        };
     }
 
     public async Task<TimeZonePeriods> LoadZoneAsync(long timeZoneId, CancellationToken cancellationToken = default)
@@ -111,3 +120,6 @@ public sealed class CatalogLoader(PizzaMagicDbContext db, PricingMethodRegistry?
         j.TaxRoundingMethod switch { "HALF_UP" => TaxRoundingMethod.HalfUp, "TRUNCATE" => TaxRoundingMethod.Truncate, _ => null },
         j.TaxRoundingScope switch { "COMBINED" => TaxRoundingScope.Combined, "PER_LEVEL" => TaxRoundingScope.PerLevel, _ => null });
 }
+
+/// <summary>The requested restaurant does not exist (or there is no default restaurant).</summary>
+public sealed class RestaurantNotFoundException(string message) : Exception(message);

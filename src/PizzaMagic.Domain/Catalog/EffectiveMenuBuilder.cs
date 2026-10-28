@@ -51,6 +51,11 @@ public static class EffectiveMenuBuilder
 
         var globalDefaults = catalog.Products.Where(p => p.IsDefault).Select(p => p.Id).ToHashSet();
         var catalogTypes = catalog.Products.ToDictionary(p => p.Code, p => p.Type);
-        return new EffectiveMenu(overrides.RestaurantId, available, catalogTypes, globalDefaults, tierRules);
+        var tiers = catalog.Tiers
+            .Where(t => t.IsActive)
+            .OrderBy(t => t.SortOrder).ThenBy(t => t.Id)
+            .Select(t => new ToppingTierInfo(t.Id, t.Code, t.DisplayName, t.SortOrder))
+            .ToList();
+        return new EffectiveMenu(overrides.RestaurantId, available, catalogTypes, globalDefaults, tierRules, tiers);
     }
 }

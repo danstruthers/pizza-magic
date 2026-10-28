@@ -19,9 +19,11 @@ public sealed class EffectiveMenu
         IEnumerable<EffectiveProduct> available,
         IReadOnlyDictionary<string, ProductType> catalogTypes,
         IReadOnlySet<long> globalDefaultIds,
-        Dictionary<long, (PricingRule, IToppingPricingMethod)> tierRules)
+        Dictionary<long, (PricingRule, IToppingPricingMethod)> tierRules,
+        IReadOnlyList<ToppingTierInfo> tiers)
     {
         RestaurantId = restaurantId;
+        Tiers = tiers;
         _available = available.ToDictionary(p => (p.Type, p.Code));
         _catalogTypes = new Dictionary<string, ProductType>(catalogTypes, StringComparer.Ordinal);
         _tierRules = tierRules;
@@ -30,6 +32,9 @@ public sealed class EffectiveMenu
     }
 
     public long RestaurantId { get; }
+
+    /// <summary>The active topping tiers in display order (the menu groups toppings by tier).</summary>
+    public IReadOnlyList<ToppingTierInfo> Tiers { get; }
 
     /// <summary>The crust used when a pizza line omits one; null if no crust is available here.</summary>
     public EffectiveProduct? DefaultCrust { get; }

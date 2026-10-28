@@ -28,7 +28,10 @@ public class MenuApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var bacon = menu.ToppingTiers[1].Toppings[0];
         bacon.Prices.Select(p => p.Value["WHOLE"]).ShouldBe([55L, 77L, 132L]);
 
-        menu.Policy.ShouldBe(new MenuPolicyResponse(20, 20, 12, 3, 50_000, 1_000_000, [150_000, 180_000, 200_000]));
+        var p = menu.Policy;
+        (p.MaxLines, p.MaxLineQuantity, p.MaxToppingsPerPizza, p.MaxPromoCodes, p.MaxTipAmountCents, p.MaxTipPercentPpm)
+            .ShouldBe((20, 20, 12, 3, 50_000L, 1_000_000));
+        p.TipPresetsPpm.ShouldBe([150_000, 180_000, 200_000]);
     }
 
     [Fact]

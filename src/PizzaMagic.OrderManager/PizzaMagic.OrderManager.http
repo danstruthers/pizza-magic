@@ -1,3 +1,48 @@
 @PizzaMagic.OrderManager_HostAddress = http://localhost:5100
 
-###
+### The default restaurant's menu, with server-computed topping prices
+GET {{PizzaMagic.OrderManager_HostAddress}}/api/v1/menu
+Accept: application/json
+
+### P9: 2 x Large + pepperoni + bacon, ILOVEPIZZA, 15% tip -> $31.48
+POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/quotes
+Content-Type: application/json
+
+{
+  "lineItems": [ { "kind": "Pizza", "sizeCode": "LARGE", "quantity": 2,
+                   "toppings": [ { "code": "PEPPERONI" }, { "code": "BACON" } ] } ],
+  "promoCodes": [ "ILOVEPIZZA" ],
+  "tip": { "mode": "Percent", "value": "15" }
+}
+
+### P24: a conflicting second code is Rejected; total unchanged ($31.48)
+POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/quotes
+Content-Type: application/json
+
+{
+  "lineItems": [ { "kind": "Pizza", "sizeCode": "LARGE", "quantity": 2,
+                   "toppings": [ { "code": "PEPPERONI" }, { "code": "BACON" } ] } ],
+  "promoCodes": [ "ILOVEPIZZA", "SAVE5" ],
+  "tip": { "mode": "Percent", "value": "15" }
+}
+
+### Dollar tip with its effective rate: $3.00 (10.96%)
+POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/quotes
+Content-Type: application/json
+
+{
+  "lineItems": [ { "kind": "Pizza", "sizeCode": "LARGE", "quantity": 2,
+                   "toppings": [ { "code": "PEPPERONI" }, { "code": "BACON" } ] } ],
+  "promoCodes": [ "ILOVEPIZZA" ],
+  "tip": { "mode": "Amount", "value": "3.00" }
+}
+
+### Field errors: 422 with JSON paths
+POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/quotes
+Content-Type: application/json
+
+{
+  "lineItems": [ { "kind": "Pizza", "sizeCode": "LARGE", "quantity": 0,
+                   "toppings": [ { "code": "PEPPERONI", "portion": "LEFT" } ] } ],
+  "tip": { "mode": "Amount", "value": "1.234" }
+}
