@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dev-time only: generates data/seed/0000-time-zones.sql from NodaTime's embedded tzdb (UQ15).
+       Nothing under src/ may reference this project or NodaTime. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NodaTime" />
+  </ItemGroup>
+
+</Project>

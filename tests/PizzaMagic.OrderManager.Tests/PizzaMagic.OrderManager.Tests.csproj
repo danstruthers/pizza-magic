@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="xunit" />
@@ -20,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PizzaMagic.OrderManager\PizzaMagic.OrderManager.csproj" />
+    <!-- Only for Time_zone_seed_matches_tzdb: the committed seed must equal the generator's output. -->
+    <ProjectReference Include="..\..\tools\PizzaMagic.TzSeedGen\PizzaMagic.TzSeedGen.csproj" />
   </ItemGroup>
 
 </Project>
