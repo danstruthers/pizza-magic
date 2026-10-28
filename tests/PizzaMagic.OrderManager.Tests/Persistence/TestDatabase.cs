@@ -43,10 +43,14 @@ public sealed class TestDatabase : IAsyncDisposable
     public PizzaMagicDbContext NewContext() =>
         new(new DbContextOptionsBuilder<PizzaMagicDbContext>().UsePizzaMagicSqlite(ConnectionString).Options);
 
+    /// <summary>Runs raw SQL as-is (ADO.NET, not ExecuteSqlRaw, which treats JSON braces as format placeholders).</summary>
     public async Task ExecuteAsync(string sql)
     {
-        await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(sql);
+        await using var connection = new Microsoft.Data.Sqlite.SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync();
     }
 
     public async Task<long> ScalarAsync(string sql)
