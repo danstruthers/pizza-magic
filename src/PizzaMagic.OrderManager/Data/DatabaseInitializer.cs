@@ -17,7 +17,8 @@ public sealed class CatalogValidationException(IReadOnlyList<string> errors)
 /// </summary>
 public static class DatabaseInitializer
 {
-    public static async Task MigrateAndSeedAsync(PizzaMagicDbContext db, string dataDirectory, TimeProvider clock, CancellationToken cancellationToken = default)
+    public static async Task MigrateAndSeedAsync(
+        PizzaMagicDbContext db, string dataDirectory, TimeProvider clock, SeedProfile profile = SeedProfile.Default, CancellationToken cancellationToken = default)
     {
         await db.Database.MigrateAsync(cancellationToken);
         // journal_mode cannot change inside a transaction, so it runs on its own.
@@ -30,7 +31,7 @@ public static class DatabaseInitializer
         {
             await db.Database.CloseConnectionAsync();
         }
-        await new DataScriptRunner(db, clock).ApplySeedsAsync(dataDirectory, cancellationToken);
+        await new DataScriptRunner(db, clock).ApplyAsync(dataDirectory, profile, cancellationToken);
     }
 
     public static async Task InitializeAsync(
@@ -39,9 +40,10 @@ public static class DatabaseInitializer
         TimeProvider clock,
         PromotionRegistry promotions,
         PricingMethodRegistry pricingMethods,
+        SeedProfile profile = SeedProfile.Default,
         CancellationToken cancellationToken = default)
     {
-        await MigrateAndSeedAsync(db, dataDirectory, clock, cancellationToken);
+        await MigrateAndSeedAsync(db, dataDirectory, clock, profile, cancellationToken);
         var errors = await new CatalogValidator(db, promotions, pricingMethods, clock).ValidateAsync(cancellationToken);
         if (errors.Count > 0)
         {

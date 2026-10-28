@@ -17,6 +17,8 @@
     <EmbeddedResource Include="Data\Schema\*.sql" />
     <!-- Seed scripts live in the repository's data/ folder and are applied at startup in name order (section 2.12). -->
     <Content Include="..\..\data\seed\*.sql" LinkBase="data\seed" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Test data (M15F): applied only by the Fantasy profile (Seed:Profile=Fantasy), never to the default database. -->
+    <Content Include="..\..\data\test\*.sql" LinkBase="data\test" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -22,6 +22,9 @@ public sealed class DataScriptChangedException(string message) : Exception(messa
 /// </summary>
 public sealed class DataScriptRunner(PizzaMagicDbContext db, TimeProvider clock)
 {
+    public Task<IReadOnlyList<DataScriptResult>> ApplyAsync(string dataDirectory, SeedProfile profile, CancellationToken cancellationToken = default) =>
+        profile == SeedProfile.Default ? ApplySeedsAsync(dataDirectory, cancellationToken) : throw new NotImplementedException();
+
     public async Task<IReadOnlyList<DataScriptResult>> ApplySeedsAsync(string dataDirectory, CancellationToken cancellationToken = default)
     {
         var scripts = Directory.GetFiles(Path.Combine(dataDirectory, "seed"), "*.sql")
