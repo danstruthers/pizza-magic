@@ -53,3 +53,7 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - The first `PercentFormatter.FormatBasisPointsCompact` trimmed trailing zeros with a chain of string replacements that was hard to verify and risky for values like 10%, where removing "0%" breaks the number. It was replaced before any commit with integer-based formatting, and 10% and 10.05% test cases were added.
 
 **Verified rather than trusted:** the effective-tip-rate examples (10.96%, 21.91% and the 0.05% half-up case) were recomputed independently with a script before being written into the tests.
+
+## 2026-10-28: M7 state machine
+
+**Process slip found and corrected:** plan section 7.1 says red commits must compile: tests plus `NotImplementedException` stubs, failing for the right reason. The red commits for M1-M6 instead failed to compile on missing types. The M7 red commit also contained a real syntax error (`from from in ...` in a query). It was caught before the implementation, fixed, given stubs, and amended (it had not been pushed). It now fails with 83 `NotImplementedException` failures and nothing else. The earlier red commits are pushed history and are left as they are; from M8 on, red commits compile.

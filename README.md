@@ -13,7 +13,7 @@ The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](
 
 ## Current status
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M5**, which is the whole pricing core. The two apps start and serve their pages, but the HTTP API, the database and the order builder screens come in M8-M14.
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M7**: the whole pricing core, the order description and the order state machine. The two apps start and serve their pages, but the HTTP API, the database and the order builder screens come in M8-M14.
 
 | Milestone | What it adds | Status |
 |---|---|---|
@@ -23,8 +23,9 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 | M3 | Promotion engine: ILOVEPIZZA / SAVE5 as data, conflicts, validity windows | Done |
 | M4 | Tax: Washington 6.5%, rounding method from the jurisdiction's data | Done |
 | M5 | Pricing engine: validation, discounts, tax, tip (with effective %), totals | Done |
-| M6-M7 | Order description, order state machine | Next |
-| M8-M11 | Database, menu/quote/order API, idempotent submit, update/cancel/kitchen | Planned |
+| M6 | Order description: "2 x Large pizza with Pepperoni, Bacon", promos, tax, tip, total | Done |
+| M7 | Order state machine: kitchen steps forward, customer cancels only while Not Started | Done |
+| M8-M11 | Database, menu/quote/order API, idempotent submit, update/cancel/kitchen | Next |
 | M12-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Planned |
 | M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
 
@@ -49,7 +50,7 @@ dotnet tool restore     # restores the pinned dotnet-ef tool (needed from M8)
 dotnet test             # builds everything and runs all tests
 ```
 
-Expected result today: about 1,700 tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
+Expected result today: about 1,800 tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
 
 Useful variations:
 
@@ -73,6 +74,7 @@ Test areas (all in `tests/PizzaMagic.Domain.Tests` so far):
 | `Tax` | 6.5% half-up per RCW 82.08.054, the TRUNCATE option, tax lines that sum exactly |
 | `Time` | UTC to Los Angeles local time from stored offset periods, including both 2026 DST switches |
 | `Pricing` | Full quotes: totals to the cent, validation errors with field paths, tips, and properties over 500 generated orders |
+| `Ordering` | The order description and every allowed or refused status change (all 25 status pairs for each actor) |
 
 ## Run the apps
 
