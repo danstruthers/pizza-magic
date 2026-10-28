@@ -10,13 +10,16 @@ public sealed record PromotionDefinition(
     string Name,
     string EffectType,
     string EffectParams,
-    int Priority = 100,
+    int Priority = PromotionDefinition.DefaultPriority,
     bool IsExclusive = false,
     string? ExclusionGroup = null,
     DateTime? ValidFromLocal = null,
     DateTime? ValidToLocal = null,
     bool IsActive = true)
 {
+    /// <summary>The <c>promotion.priority</c> column default.</summary>
+    public const int DefaultPriority = 100;
+
     public IReadOnlyList<ConditionDefinition> Conditions { get; init; } = [];
 
     /// <summary>Restaurants the promotion is limited to; empty means every restaurant.</summary>
