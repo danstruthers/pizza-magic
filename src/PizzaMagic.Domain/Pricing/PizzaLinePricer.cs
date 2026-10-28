@@ -36,7 +36,7 @@ public static class PizzaLinePricer
         foreach (var topping in toppings)
         {
             var price = menu.ToppingUnitPrice(topping, basePrice);
-            components.Add(new PricedComponent(ComponentKind.Topping, topping, price.UnitPrice, price.Source, topping.TaxClassId));
+            components.Add(new PricedComponent(ComponentKind.Topping, topping, price.UnitPrice, price.Source, topping.TaxClassId, price));
         }
 
         var unitPrice = components.Aggregate(Money.Zero, (sum, c) => sum + c.UnitCharge);
