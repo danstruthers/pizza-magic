@@ -13,7 +13,7 @@ The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](
 
 ## Current status
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M8**: the whole pricing core, the order description, the order state machine and the database (schema, seed data, startup validation). The two apps start and serve their pages; the HTTP API and the order builder screens come in M9-M14.
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M9**: the whole pricing core, the order description, the order state machine, the database (schema, seed data, startup validation), and the menu and quote API. Orders (submit, status, update, cancel, kitchen) come in M10-M11 and the order builder screens in M12-M14.
 
 | Milestone | What it adds | Status |
 |---|---|---|
@@ -26,7 +26,8 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 | M6 | Order description: "2 x Large pizza with Pepperoni, Bacon", promos, tax, tip, total | Done |
 | M7 | Order state machine: kitchen steps forward, customer cancels only while Not Started | Done |
 | M8 | Database: full SQLite schema, seed scripts (menu, WA tax, promos, time zones), startup validation | Done |
-| M9-M11 | Menu/quote/order API, idempotent submit, update/cancel/kitchen | Next |
+| M9 | API: `GET /api/v1/menu` and `POST /api/v1/quotes` (live pricing with validation errors by field) | Done |
+| M10-M11 | Order API: idempotent submit, status, update/cancel, kitchen advance | Next |
 | M12-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Planned |
 | M15F | Fantasy realm test database: invented zones, restaurants, tiered taxes 0-75%, a MYTHIC topping tier, themed crusts and sauces | Planned |
 | M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
@@ -34,7 +35,7 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 **What you can look at today:**
 - **The pricing core, through its tests.** Every worked example in the plan (for instance P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = **$31.48**) is a test you can run (see below).
 - **The order builder** at http://localhost:5000: the branded welcome page (logo, favicon). The builder screens arrive in M13.
-- **The order service** at http://localhost:5100/swagger: on first start it creates and seeds `pizzamagic.db` and validates the catalog, then serves Swagger (no endpoints yet; M9).
+- **The order service** at http://localhost:5100/swagger: on first start it creates and seeds `pizzamagic.db` and validates the catalog. Try the menu and price any order in Swagger, or with the ready-made requests in `src/PizzaMagic.OrderManager/PizzaMagic.OrderManager.http` (see "Try the API" below).
 
 ## Prerequisites
 
@@ -82,6 +83,7 @@ And in `tests/PizzaMagic.OrderManager.Tests` (each test builds a real SQLite dat
 
 | Folder | Covers |
 |---|---|
+| `Api` | The menu and quote endpoints over HTTP against a real database: prices to the cent, promo outcomes, field errors by path, malformed JSON |
 | `Persistence` | All 33 tables and their CHECK / foreign-key rules, the seed matching the spec, the spec examples priced from the database, the seed-script runner, startup validation, UTC and local time columns, and the time zone seed matching tzdb |
 
 ## Run the apps
@@ -98,6 +100,20 @@ Stop either one with Ctrl+C. The ports come from each project's `Properties/laun
 On first start the order service creates `pizzamagic.db` next to the project, applies the seed scripts in `data/seed`, and validates the catalog (it refuses to start if the data is invalid). Delete `pizzamagic.db*` to reset it; the `.gitignore` already excludes it. The time zone seed is generated: after a NodaTime upgrade, run `dotnet run --project tools/PizzaMagic.TzSeedGen` from the repository root and commit the result.
 
 Docker Compose is designed but not part of the built scope (plan M17).
+
+## Try the API
+
+With the order service running (bash or Git Bash; in PowerShell use the `.http` file or Swagger instead):
+
+```bash
+# The menu, with server-computed topping prices
+curl http://localhost:5100/api/v1/menu
+
+# Price an order (P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = $31.48)
+curl -X POST http://localhost:5100/api/v1/quotes -H 'Content-Type: application/json' -d '{"lineItems":[{"kind":"Pizza","sizeCode":"LARGE","quantity":2,"toppings":[{"code":"PEPPERONI"},{"code":"BACON"}]}],"promoCodes":["ILOVEPIZZA"],"tip":{"mode":"Percent","value":"15"}}'
+```
+
+The quote returns every intermediate value (line prices, discounts and where they landed, tax lines, tip, total), a written description, the order as the server will accept it (`normalizedDraft`) and whether it can be submitted (`canSubmit`). Promo code problems never fail a quote: each code gets its own status (Applied, NotEligible, Rejected, InvalidFormat, ...). Field errors return 422 with a message per JSON path. More examples, including a conflicting promo code, a dollar tip with its effective percentage and field errors, are in `PizzaMagic.OrderManager.http`, which Visual Studio and VS Code (REST Client) can run directly.
 
 ## Repository layout
 

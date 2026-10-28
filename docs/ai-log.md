@@ -68,3 +68,11 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - The DDL and both seeds were first loaded into SQLite with Node's built-in `node:sqlite`, with foreign keys on: 17 products, 217 offset periods, and no foreign-key violations.
 - The generated time zone seed matches the plan's hand-checked 2026 Los Angeles switches.
 - The service was started on a fresh database and the data was read back: both scripts were logged, and `journal_mode` was `wal`.
+
+## 2026-10-28: M9 menu and quote API
+
+**Fixed AI output:**
+- `SuppressImplicitRequiredAttributeForNonNullableReferenceTypes` was first set on `ApiBehaviorOptions`, where it does not exist (it is on `MvcOptions`). The build caught it.
+- Two tests compared records that hold lists with `ShouldBe` / `ShouldBeEquivalentTo`. That compares the list by reference, and the equivalence check also compares collection types (array vs List). This is the same trap as in M5. Those assertions now compare the scalar fields and the list separately.
+
+**Verified rather than trusted:** the running service was exercised with curl: the menu grid, and the P24 quote (both codes) returning 3148 with ILOVEPIZZA Applied, SAVE5 Rejected and the expected description. The README's curl command was also run verbatim and returned 3148.
