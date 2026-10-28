@@ -98,6 +98,17 @@ public class EffectiveMenuTests
     }
 
     [Fact]
+    public void Global_default_wins_over_a_lower_sort_order()
+    {
+        // THIN sorts before HAND_TOSSED, but HAND_TOSSED carries is_default, so it stays the default.
+        var snapshot = SeedCatalog.Snapshot()
+            .WithProduct(new ProductRow(202, ProductType.Crust, "THIN", "Thin", 0, null, null, SeedCatalog.PreparedFood, false, SortOrder: 0));
+        var menu = Build(snapshot, RestaurantOverrides.None(SeedCatalog.DefaultRestaurantId));
+
+        menu.DefaultCrust!.Code.ShouldBe("HAND_TOSSED");
+    }
+
+    [Fact]
     public void Default_crust_falls_back_to_the_lowest_sort_order_available_here()
     {
         var snapshot = SeedCatalog.Snapshot()
