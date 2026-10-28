@@ -144,6 +144,17 @@ public class PricingEngineTests
         PizzaMagic.Contracts.PercentFormatter.FormatBasisPoints(basisPoints).ShouldBe(expected);
     }
 
+    // A percent the customer entered is shown as entered: no trailing zeros.
+    [Theory]
+    [InlineData(1500, "15%")]
+    [InlineData(1750, "17.5%")]
+    [InlineData(1825, "18.25%")]
+    [InlineData(0, "0%")]
+    public void Entered_rate_formats_without_trailing_zeros(long basisPoints, string expected)
+    {
+        PizzaMagic.Contracts.PercentFormatter.FormatBasisPointsCompact(basisPoints).ShouldBe(expected);
+    }
+
     [Fact]
     public void Tip_is_not_taxed()
     {
