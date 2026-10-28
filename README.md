@@ -13,7 +13,7 @@ The full design, milestone plan and decisions are in [docs/DEVELOPMENT_PLAN.md](
 
 ## Current status
 
-The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M7**: the whole pricing core, the order description and the order state machine. The two apps start and serve their pages, but the HTTP API, the database and the order builder screens come in M8-M14.
+The project is built test-first, milestone by milestone (plan section 8). **Done so far: M0-M8**: the whole pricing core, the order description, the order state machine and the database (schema, seed data, startup validation). The two apps start and serve their pages; the HTTP API and the order builder screens come in M9-M14.
 
 | Milestone | What it adds | Status |
 |---|---|---|
@@ -25,14 +25,16 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 | M5 | Pricing engine: validation, discounts, tax, tip (with effective %), totals | Done |
 | M6 | Order description: "2 x Large pizza with Pepperoni, Bacon", promos, tax, tip, total | Done |
 | M7 | Order state machine: kitchen steps forward, customer cancels only while Not Started | Done |
-| M8-M11 | Database, menu/quote/order API, idempotent submit, update/cancel/kitchen | Next |
+| M8 | Database: full SQLite schema, seed scripts (menu, WA tax, promos, time zones), startup validation | Done |
+| M9-M11 | Menu/quote/order API, idempotent submit, update/cancel/kitchen | Next |
 | M12-M15 | Order builder UI with running total, checkout, status pages, end-to-end tests | Planned |
+| M15F | Fantasy realm test database: invented zones, restaurants, tiered taxes 0-75%, a MYTHIC topping tier, themed crusts and sauces | Planned |
 | M16 | README sections required by the spec: API reference, assumptions, design write-up, AI usage note | Planned |
 
 **What you can look at today:**
 - **The pricing core, through its tests.** Every worked example in the plan (for instance P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = **$31.48**) is a test you can run (see below).
 - **The order builder** at http://localhost:5000: the branded welcome page (logo, favicon). The builder screens arrive in M13.
-- **The order service** at http://localhost:5100/swagger: it starts and serves Swagger, with no endpoints yet (M9).
+- **The order service** at http://localhost:5100/swagger: on first start it creates and seeds `pizzamagic.db` and validates the catalog, then serves Swagger (no endpoints yet; M9).
 
 ## Prerequisites
 
@@ -46,11 +48,11 @@ Nothing else: there is no database server to install. SQLite runs inside the ord
 From the repository root:
 
 ```bash
-dotnet tool restore     # restores the pinned dotnet-ef tool (needed from M8)
+dotnet tool restore     # restores the pinned dotnet-ef tool
 dotnet test             # builds everything and runs all tests
 ```
 
-Expected result today: about 1,800 tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
+Expected result today: about 1,900 tests passing, with 0 warnings. Warnings are treated as errors, so a warning fails the build.
 
 Useful variations:
 
@@ -64,7 +66,7 @@ dotnet test --filter "FullyQualifiedName~PizzaMagic.Domain.Tests.Tax"
 dotnet test --filter "FullyQualifiedName~Golden_vectors_price_to_the_cent" --logger "console;verbosity=normal"
 ```
 
-Test areas (all in `tests/PizzaMagic.Domain.Tests` so far):
+Test areas in `tests/PizzaMagic.Domain.Tests`:
 
 | Folder | Covers |
 |---|---|
@@ -75,6 +77,12 @@ Test areas (all in `tests/PizzaMagic.Domain.Tests` so far):
 | `Time` | UTC to Los Angeles local time from stored offset periods, including both 2026 DST switches |
 | `Pricing` | Full quotes: totals to the cent, validation errors with field paths, tips, and properties over 500 generated orders |
 | `Ordering` | The order description and every allowed or refused status change (all 25 status pairs for each actor) |
+
+And in `tests/PizzaMagic.OrderManager.Tests` (each test builds a real SQLite database in a temp file):
+
+| Folder | Covers |
+|---|---|
+| `Persistence` | All 33 tables and their CHECK / foreign-key rules, the seed matching the spec, the spec examples priced from the database, the seed-script runner, startup validation, UTC and local time columns, and the time zone seed matching tzdb |
 
 ## Run the apps
 
@@ -87,7 +95,7 @@ dotnet run --project src/PizzaMagic.Web             # order builder: http://loca
 
 Stop either one with Ctrl+C. The ports come from each project's `Properties/launchSettings.json`. To use a different port, add for example `--urls http://localhost:5200`.
 
-Once the database exists (M8), the order service creates `pizzamagic.db` on first start. Delete `pizzamagic.db*` to reset it. The `.gitignore` already excludes it.
+On first start the order service creates `pizzamagic.db` next to the project, applies the seed scripts in `data/seed`, and validates the catalog (it refuses to start if the data is invalid). Delete `pizzamagic.db*` to reset it; the `.gitignore` already excludes it. The time zone seed is generated: after a NodaTime upgrade, run `dotnet run --project tools/PizzaMagic.TzSeedGen` from the repository root and commit the result.
 
 Docker Compose is designed but not part of the built scope (plan M17).
 

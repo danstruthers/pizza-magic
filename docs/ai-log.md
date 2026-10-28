@@ -57,3 +57,14 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 ## 2026-10-28: M7 state machine
 
 **Process slip found and corrected:** plan section 7.1 says red commits must compile: tests plus `NotImplementedException` stubs, failing for the right reason. The red commits for M1-M6 instead failed to compile on missing types. The M7 red commit also contained a real syntax error (`from from in ...` in a query). It was caught before the implementation, fixed, given stubs, and amended (it had not been pushed). It now fails with 83 `NotImplementedException` failures and nothing else. The earlier red commits (M1-M6) are not pushed either, but rewriting six milestones of history to add stubs was judged not worth it, so they stay as they are and this note records the deviation. From M8 on, red commits compile.
+
+## 2026-10-28: M8 persistence
+
+**Design decision:** the schema is the plan's DDL verbatim, as hand-written SQL run by the migration. It is not regenerated from EF fluent configuration, which avoids maintaining a second definition of 33 tables and dozens of CHECKs that could drift. The EF model maps only the tables the code uses.
+
+**Fixed AI output:** the test helper first ran raw SQL through `ExecuteSqlRawAsync`, which calls `string.Format` even with no parameters, so statements containing JSON (`{"amountCents":...}`) failed with `FormatException` (8 tests). The seed runner already used raw ADO.NET for exactly this reason; the helper was switched too.
+
+**Verified rather than trusted:**
+- The DDL and both seeds were first loaded into SQLite with Node's built-in `node:sqlite`, with foreign keys on: 17 products, 217 offset periods, and no foreign-key violations.
+- The generated time zone seed matches the plan's hand-checked 2026 Los Angeles switches.
+- The service was started on a fresh database and the data was read back: both scripts were logged, and `journal_mode` was `wal`.
