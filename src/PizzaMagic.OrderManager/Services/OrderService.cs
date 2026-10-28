@@ -23,6 +23,18 @@ public enum SubmitOutcome
     PriceChanged,
 }
 
+/// <summary>M11 red-phase stub.</summary>
+public enum OrderOutcome
+{
+    Ok,
+    NotCancellable,
+    InvalidTransition,
+    NotModifiable,
+}
+
+/// <summary>M11 red-phase stub.</summary>
+public sealed record OrderResult(OrderOutcome Outcome, object? Payload = null);
+
 /// <summary>The result of a submit; the controller turns it into the HTTP response.</summary>
 public sealed record SubmitResult(
     SubmitOutcome Outcome,
@@ -164,6 +176,15 @@ public sealed partial class OrderService(
             .AsSplitQuery()
             .SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
+
+    public Task<OrderResult> UpdateAsync(Guid orderId, UpdateOrderRequest request, string? ifMatch, string? key, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<OrderResult> CancelAsync(Guid orderId, string? ifMatch, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<OrderResult> AdvanceAsync(Guid orderId, AdvanceOrderRequest request, Domain.Ordering.OrderActor actor, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
 
     public Task<Domain.Time.TimeZonePeriods> ZoneAsync(CustomerOrderEntity order, CancellationToken cancellationToken = default) =>
         loader.LoadZoneAsync(order.TimeZoneId, cancellationToken);

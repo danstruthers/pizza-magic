@@ -13,6 +13,33 @@ public sealed record SubmitOrderRequest(
     long? ExpectedTotalCents,
     string? CustomerName);
 
+/// <summary>
+/// PUT /api/v1/orders/{id} (requires If-Match: "version"; optional Idempotency-Key). Replaces the order's content
+/// while it is Not Started. There is no restaurantId or channel: those are fixed at creation (400 if sent).
+/// </summary>
+public sealed record UpdateOrderRequest(
+    IReadOnlyList<LineItemRequest>? LineItems,
+    IReadOnlyList<string>? PromoCodes,
+    TipRequest? Tip,
+    long? ExpectedTotalCents,
+    string? CustomerName);
+
+/// <summary>POST /api/v1/kitchen/orders/{id}/advance: the status the kitchen believes the order is in (required).</summary>
+public sealed record AdvanceOrderRequest(string? ExpectedStatus);
+
+/// <summary>
+/// The kitchen's result: the new status, whether the call was a repeat (alreadyApplied), and the content the kitchen
+/// committed to, read in the same transaction as the status change.
+/// </summary>
+public sealed record AdvanceOrderResponse(
+    string OrderId,
+    string PreviousStatus,
+    string Status,
+    int Version,
+    bool AlreadyApplied,
+    IReadOnlyList<QuoteLineResponse> LineItems,
+    string Description);
+
 /// <summary>A stored order, rendered only from its snapshot (never re-priced).</summary>
 public sealed record OrderResponse(
     string OrderId,
