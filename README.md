@@ -38,7 +38,7 @@ The project is built test-first, milestone by milestone (plan section 8). **Done
 
 **What you can look at today:**
 - **The pricing core, through its tests.** Every worked example in the plan (for instance P9: 2 large pepperoni and bacon, ILOVEPIZZA, 15% tip = **$31.48**) is a test you can run (see below).
-- **The order builder** at http://localhost:5000 (start the order service too): add pizzas, toppings, promo codes and a tip, and watch the total update; review and place the order; then follow it on its page (it refreshes every 5 seconds), change or cancel it until the kitchen starts it, and find it again under "Your orders". Advance it as the kitchen with the curl command under "Simulate the kitchen".
+- **The order builder** at http://localhost:5000 (start the order service too): add pizzas, toppings, promo codes and a tip, and watch the total update; review and place the order; then follow it on its page (it refreshes every 5 seconds), change or cancel it until the kitchen starts it, and find it again under "Your orders". Advance it as the kitchen with the curl command under "Simulating the restaurant" (in "Try the API").
 - **The order service** at http://localhost:5100/swagger: on first start it creates and seeds `pizzamagic.db` and validates the catalog. Try the menu and price any order in Swagger, or with the ready-made requests in `src/PizzaMagic.OrderManager/PizzaMagic.OrderManager.http` (see "Try the API" below).
 
 ## Prerequisites
