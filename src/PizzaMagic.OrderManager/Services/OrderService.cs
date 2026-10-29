@@ -126,7 +126,11 @@ public sealed partial class OrderService(
         var stored = await db.Orders.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
         if (await DiagnoseEditAsync(stored, version, cancellationToken) is { } preCheck)
         {
-            return preCheck;
+            // A copy of this request may have committed since the lookup above, moving the version on with its own
+            // edit; its key record committed in the same transaction, so look again before refusing (else a retry gets 412).
+            return key is not null && await LiveRecordAsync(key, RequestHasher.UpdateOperation, now, cancellationToken) is { } committed
+                ? Replay(committed, hash)
+                : preCheck;
         }
 
         // 4. Price with the stored restaurant and channel at current catalog data.
