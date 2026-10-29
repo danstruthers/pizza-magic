@@ -225,3 +225,19 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 **Fixed and guarded:** the classes are now Bootstrap 5.1's `bg-*` (with `text-dark` on amber and blue). `StylesheetTests.Every_colour_class_used_exists_in_the_shipped_bootstrap` scans the web app's views, C# and scripts for colour classes and requires each to exist in the shipped `bootstrap.min.css`; it failed on all 9 uses before the fix. Screenshots after the fix show the badges on "Your orders", the kitchen page and the builder's promo list.
 
 **Lesson:** for UI changes, look at the page (screenshots), not only at its text.
+
+## 2026-10-28: code review and fixes (UQ31)
+
+**Process:** four independent reviewers (pricing vs spec; order service; web app; deliverables vs the evaluation criteria) were given the spec and the code, not the author's conclusions. Every finding was checked against the code before acting; the user approved fixing all must-fix and should-fix items, test first. A fifth pass (four reviewers by folder) then checked every comment against the code it describes.
+
+**Found by review, missed by the existing tests** (each now has a test that failed first):
+- A 28-digit tip overflowed `decimal` and returned an empty 500; null lines or toppings returned 500; a 15 MB request produced a 63 MB validation response; a stray `productCode` was silently ignored.
+- A promo code entered twice made `canSubmit` false although the order would submit.
+- Web: Place ignored an existing lock, so an older Review page could create a second order nobody would see; the lock was saved only after the order service answered, and the call was tied to the browser connection.
+- The builder un-greyed a stale total, and "Total unavailable — retrying" never retried.
+- The property tests only checked the engine against itself; an ILOVEPIZZA at 9% passed all of them. A new oracle written from the spec's table fails 143 of 500 generated orders under that mutation (reverted).
+- Writing the untested-race tests exposed a real bug: a retried update whose first copy committed between the copy's key lookup and its version check got 412 for its own change (1 of 10 copies in the first iteration). Fixed by re-checking the key before refusing.
+
+**Fixed AI output (README):** "83¢ × 10 = $83.30" (10× error; it is $8.30); "six rounding points" (two are not built); "the spec's worked examples" (they are our own); a "2+ pizzas" extensibility example that the code can't support without an engine change (replaced by "Tuesdays only", which it can); an AI note whose "rejected" example was the author's own instruction and whose "verified myself" example was agent-run.
+
+**Fixed AI output (tests written during the fixes):** two test bodies sent `expectedTotalCents` to `/quotes` (correctly refused as an unknown property); a parallel-update assertion first required `Ok` for every copy when `Replayed` is the correct outcome for the others.
