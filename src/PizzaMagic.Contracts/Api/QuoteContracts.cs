@@ -13,7 +13,8 @@ public sealed record QuoteRequest(
 
 /// <summary>
 /// One line. <c>kind</c> is "Pizza" (built) or "AddOn" (designed, not built). <c>portion</c> and <c>multiplier</c>
-/// on toppings exist so placements can be added without a contract change; the built scope accepts WHOLE x1 only.
+/// on toppings exist so placements can be added without a contract change; the built scope accepts WHOLE only, 1x up to
+/// the topping's max multiplier (A69, UQ29).
 /// </summary>
 public sealed record LineItemRequest(
     string? Kind,

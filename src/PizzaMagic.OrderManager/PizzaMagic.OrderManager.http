@@ -98,6 +98,9 @@ Idempotency-Key: try-it-update-1
   "expectedTotalCents": 1574
 }
 
+### Kitchen queue: the default restaurant's active orders, oldest first, each with its next status (add ?restaurantId=1003 on the fantasy database)
+GET {{PizzaMagic.OrderManager_HostAddress}}/api/v1/kitchen/orders
+
 ### Kitchen: advance one step (NotStarted -> Started -> ReadyForPickup -> Delivered); repeat = alreadyApplied
 POST {{PizzaMagic.OrderManager_HostAddress}}/api/v1/kitchen/orders/{{submit.response.body.$.orderId}}/advance
 Content-Type: application/json

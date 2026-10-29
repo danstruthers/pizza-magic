@@ -25,7 +25,7 @@ The order lifecycle has these properties:
 - Its transitions are conditional UPDATEs, so the database decides races.
 - Retries are made safe with idempotency keys and `If-Match`.
 
-The plan is test-first throughout and lists hand-computed test vectors to the cent. **Build scope (user decision UQ7): core path only.** M0–M16 are built: the spec-required path plus the README, design write-up and AI note, with the full unified schema, in about **7 h 35 m** (455 min). The extended design (X1–X6, the EXT parts of core milestones, M17–M19) stays fully specified in this plan but is **designed, not built (per user scope decision)**. The whole design would take about 12 h 45 m (765 min). Both numbers are well past the spec's 3-hour timebox. §8 says this plainly and gives a cut order. The twelve open questions are now answered by the user (§10). UQ6 (tax rounding) was revised on 2026-10-28 after legal research.
+The plan is test-first throughout and lists hand-computed test vectors to the cent. **Build scope (user decision UQ7): core path only.** M0–M16 are built: the spec-required path plus the README, design write-up and AI note, with the full unified schema, in about **7 h 35 m** (455 min). The extended design (X1–X6, the EXT parts of core milestones, M17–M19) stays fully specified in this plan but is **designed, not built (per user scope decision)**. The whole design would take about 12 h 45 m (765 min). Both numbers are well past the spec's 3-hour timebox. §8 says this plainly and gives a cut order. The twelve open questions are now answered by the user (§10). UQ6 (tax rounding) was revised on 2026-10-28 after legal research. **After M16, at the user's request, these were also built:** the core part of M15F (fantasy realm test database, `--database fantasy`), whole-pizza extra toppings 2x/3x with the promo-list and Review-button fixes (UQ29), status, date and summary on "Your orders", and the simulated kitchen page with its queue endpoint (UQ30).
 
 ## Table of contents
 
@@ -320,7 +320,7 @@ Marker types (`OrderManagerMarker`, `WebMarker`) stand in for `public partial cl
 | Time | `TimeProvider` (built into .NET 8). Tests use `Microsoft.Extensions.TimeProvider.Testing` 8.10.0 (`FakeTimeProvider`). | Day-of-week promos, timestamps, simulator. |
 | Time zones | **No runtime tz library and no OS tz data.** Offsets come from the `time_zone_offset_period` table (UQ15), resolved by the pure `LocalTimeResolver`. `NodaTime` 3.1.11 (embedded tzdb) is used **only at dev time**, by `tools/PizzaMagic.TzSeedGen` and the seed-verification test. | DST-correct, deterministic, and identical on Windows and Linux. A source scan forbids `TimeZoneInfo` and NodaTime in `src/`. |
 | Errors | `AddProblemDetails()`, RFC 9457 `application/problem+json` | Stable `type` URIs that the MVC app switches on. |
-| API docs | `Swashbuckle.AspNetCore` 6.6.2 at `/swagger` in Development, plus a `.http` file | Swagger doubles as the "kitchen console". |
+| API docs | `Swashbuckle.AspNetCore` 6.6.2 at `/swagger` in Development, plus a `.http` file | Swagger, and the web app's Kitchen page (UQ30), serve as the "kitchen console". |
 | Tests | xunit 2.9.3, xunit.runner.visualstudio 2.8.2, Microsoft.NET.Test.Sdk 17.11.1, **Shouldly** 4.2.1, `Microsoft.AspNetCore.Mvc.Testing` 8.0.33 | FluentAssertions v8 has a commercial license, so it is avoided. FsCheck is [STRETCH]. |
 | JS tests | Node's built-in `node --test` (Node 24 is present on the dev machine; no npm packages) | Covers the one piece of JS with real behavior: quote sequencing (§6.3). |
 | Browser E2E | None (documented cut) | The JS only renders server values. |
@@ -2120,7 +2120,7 @@ Base `/api/v1`, camelCase JSON, enums as strings, money in integer cents, codes 
 
 ### 5.3 Examples
 
-*Scope note:* the menu excerpt and the P27–P29 examples show the **designed** X1 shape, with portions and multipliers. The built scope (A69) returns only `WHOLE` grid entries and no `portions` list, and refuses half, quarter and extra toppings with `PLACEMENT_NOT_SUPPORTED`. The README's API examples therefore use whole-topping carts:
+*Scope note:* the menu excerpt and the P27–P29 examples show the **designed** X1 shape, with portions and multipliers. The built scope (A69) returns only `WHOLE` grid entries (plus each topping's `maxMultiplier`, UQ29) and no `portions` list; it accepts whole-pizza extra (2x, 3x) and refuses half and quarter toppings with `PLACEMENT_NOT_SUPPORTED`. The README's API examples therefore use whole-topping carts:
 - **P9** for the quote and submit: 2 × Large + pepperoni + bacon, ILOVEPIZZA, 15% → **$31.48**
 - **P24** for the conflict: `["ILOVEPIZZA","SAVE5"]` → ILOVEPIZZA applied, SAVE5 `Rejected`, same **$31.48**
 - **P29w** for the update with `If-Match: "1"`: P9's order changed to 1 × L+pep+bacon with ILOVEPIZZA and 15%. S 1428, D 142.8 → 143, taxable 1285, tax 83.525 → 84, bill 1369, tip 205.35 → 205, **total 1574 ($15.74)**, `ETag: "2"`
@@ -2219,9 +2219,8 @@ How the numbers are derived:
 
 **Promo typo example** (PR17): `"promoCodes": ["I LOVE PIZZA"]` returns 200 with `status: "InvalidFormat"` and the total without a discount. The normalized draft drops the code. The same raw draft submitted directly gives 422 `promotion-not-applied` at `promoCodes[0]`.
 
-**Field error example.** The request has a quantity out of range, Pepperoni WHOLE 2x at `toppings[0]`, Pepperoni LEFT 2x at `toppings[1]` and an invalid tip. The designed X1 rule is shown for the toppings. In the built scope the same request gets two `PLACEMENT_NOT_SUPPORTED` errors instead, "Half, quarter and extra toppings are designed but not built in this version.":
-- `lineItems[0].toppings[0]` (multiplier 2)
-- `lineItems[0].toppings[1]` (LEFT, multiplier 2, and a repeat)
+**Field error example.** The request has a quantity out of range, Pepperoni WHOLE 2x at `toppings[0]`, Pepperoni LEFT 2x at `toppings[1]` and an invalid tip. The designed X1 rule is shown for the toppings. In the built scope (A69 as revised by UQ29) `toppings[0]`, WHOLE 2x, is accepted, and the same request gets one topping error instead:
+- `lineItems[0].toppings[1]` (LEFT): `PLACEMENT_NOT_SUPPORTED`, "Half and quarter toppings are designed but not built in this version."
 
 The quantity and tip errors are the same in both scopes.
 ```json
@@ -2316,7 +2315,7 @@ POST /api/v1/kitchen/orders/0192f3a4-…/advance
 
 ### 5.4 Restaurant-side simulation
 1. **Manual endpoint [CORE].** Deterministic. Used in demos (Swagger, `.http`, `curl.exe`) and in integration tests.
-2. **`KitchenSimulator : BackgroundService` [STRETCH, M18: designed, not built (per user scope decision)].** The built restaurant side is the manual endpoint above. `PeriodicTimer` + `TimeProvider`. Config:
+2. **`KitchenSimulator : BackgroundService` [STRETCH, M18: designed, not built (per user scope decision)].** The built restaurant side is the manual endpoint above, plus the web app's Kitchen page that calls it (UQ30). `PeriodicTimer` + `TimeProvider`. Config:
    `"KitchenSimulator": { "Enabled": false, "PollIntervalSeconds": 5, "StartAfterSeconds": 60, "ReadyAfterSeconds": 90, "DeliverAfterSeconds": 120 }`.
    - Each tick selects orders past their threshold. It compares fixed-width `status_changed_at_utc` TEXT, which is correct thanks to R22.
    - It calls the **same** `TransitionAsync(id, expected, Actor.Simulator)`.
@@ -2333,7 +2332,7 @@ The front end is the `PizzaMagic.Web` project.
 
 | Route | Controller/action | Purpose |
 |---|---|---|
-| `GET /` | `BuilderController.Index` | Builder rendered from `GET /menu`. Per pizza line: size, crust and sauce selects ("+$1.50" from the menu), and placement rows (topping select, portion select "Whole / Left half / Right half / Upper-right quarter (Q1) / …", multiplier stepper 1..max; X6, designed, not built). **Built scope:** whole toppings as checkboxes per pizza line (A69). Plus add-on section by category (X2/X6, designed, not built), promo box with chips, tip mode, value and presets, running total panel, "Describe my order". |
+| `GET /` | `BuilderController.Index` | Builder rendered from `GET /menu`. Per pizza line: size, crust and sauce selects ("+$1.50" from the menu), and placement rows (topping select, portion select "Whole / Left half / Right half / Upper-right quarter (Q1) / …", multiplier stepper 1..max; X6, designed, not built). **Built scope:** whole toppings as checkboxes per pizza line, each with a Regular / Extra (2x) / Triple (3x) choice up to its max from the menu (A69, UQ29). Plus add-on section by category (X2/X6, designed, not built), promo box with chips, tip mode, value and presets, running total panel, "Describe my order". |
 | `POST /Builder/Quote` (JSON, antiforgery) | `BuilderController.Quote` | Save the posted draft (with `revision`) to Session if it is newer, call `QuoteAsync`, return the quote JSON or `{ errors }` |
 | `GET /Checkout` | `CheckoutController.Review` | Fresh server quote of the Session cart and full description (Req. 3). Builds a **protected review ticket from the quote's `normalizedDraft`** and `totalCents`, plus `SubmissionKey`, revision and (when editing) `OrderId` + `Version`. Shows removed-code messages and "Place order — $31.48" (P9) (or "Update order — $15.74", P29w). **If `canSubmit` is false** (field errors, empty cart, a `NotEligible` code), no ticket is issued and Place is disabled with the reasons and a "Back to builder" link. |
 | `POST /Checkout/Place` | `CheckoutController.Place` | Unprotects the ticket and submits **exactly** its normalized draft, with its total as `expectedTotalCents` and its key (PRG). If the ticket carries an `OrderId`, it calls `UpdateAsync` with `If-Match` = the ticket's version. Otherwise it calls `SubmitAsync`. Handles 201/200 / 409 / 412 / 422 / Unavailable (§6.4). |
@@ -3022,7 +3021,7 @@ The remaining EXT cells of M6 and M8–M10 are built with the step whose code th
 
 This covers the build scope (M0–M16, user decision UQ7). Items that need designed-not-built work are excluded and listed in the README instead.
 1. All six spec requirements can be demonstrated **in the browser** and through the API:
-   - multi-line build with add/remove/modify of lines and (whole) toppings. Half, quarter and extra toppings are designed, not built, and refused with `PLACEMENT_NOT_SUPPORTED`.
+   - multi-line build with add/remove/modify of lines and (whole) toppings, each 1x, 2x or 3x (UQ29). Half and quarter toppings are designed, not built, and refused with `PLACEMENT_NOT_SUPPORTED`.
    - live total including tip and promo
    - describe
    - both tip modes and both promos, with clear invalid-input messages, including the UQ3 conflict message ("SAVE5 can't be combined with ILOVEPIZZA. Remove ILOVEPIZZA to use SAVE5.")

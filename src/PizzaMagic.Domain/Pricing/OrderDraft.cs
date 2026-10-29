@@ -16,6 +16,7 @@ public sealed record PizzaDraftLine(
 
 /// <summary>
 /// One topping entry. The wire contract keeps <see cref="Portion"/> and <see cref="Multiplier"/> so placements
-/// can be added later (X1) without a contract change; the built scope accepts only WHOLE x1 (A69).
+/// can be added later (X1) without a contract change; the built scope accepts only WHOLE, 1x up to the topping's
+/// max multiplier (A69, UQ29).
 /// </summary>
 public sealed record DraftTopping(string Code, string? Portion = null, int? Multiplier = null);

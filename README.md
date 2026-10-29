@@ -110,7 +110,7 @@ A conflicting second code is not an error on a quote: `"promoCodes":["ILOVEPIZZA
 
 ## Assumptions
 
-Every place the rules were open, and what was decided. The full table (A1–A74, with rationale) is in plan section 3, and the decisions on the open questions (UQ1–UQ28) are in section 10.
+Every place the rules were open, and what was decided. The full table (A1–A74, with rationale) is in plan section 3, and the decisions on the open questions and later requests (UQ1–UQ30) are in section 10.
 
 **Prices and rounding**
 - Money is integer cents. Rounding is half away from zero ($0.325 → $0.33), never banker's rounding, and every rounded amount is rounded **before** it is multiplied by a quantity.
@@ -141,7 +141,7 @@ Every place the rules were open, and what was decided. The full table (A1–A74,
 - Retries: the same key replays the original response; the same key with a different body is refused (422). Keys last 24 hours.
 
 **Scope**
-- One restaurant is seeded, though the schema supports several (global menu plus per-store overrides). Prices are USD.
+- One restaurant is seeded in the normal database, though the schema supports several (global menu plus per-store overrides; the fantasy test database adds six). Prices are USD.
 - Toppings cover the whole pizza, once each, as Regular, Extra (2x) or Triple (3x) (up to each topping's max, from the menu data). Extra is charged per layer: the rounded topping price × 2 or × 3, then × quantity (Large Pepperoni 2x = 2 × $0.96), and described as "Pepperoni 2x". Half and quarter toppings, crust/sauce upgrades and add-ons are designed, not built, and the API refuses them with a clear message. The default crust (hand tossed) and sauce (classic tomato) are free.
 - The cart lives in an in-memory session (2 hours idle): fine for one server, lost on restart.
 
@@ -166,7 +166,7 @@ A new *kind* of rule (say "2+ pizzas") is one new `IConditionEvaluator` class re
 - *Retry after a timeout.* Creating an order requires an `Idempotency-Key`. The builder's key stays the same while the cart's content does, and its HTTP client retries with the same key and identical bytes. The service stores the response with the key in the same transaction as the order, re-checking the key inside the write lock, so a retry of a committed request replays the original response and a parallel duplicate loses. If every attempt fails, the customer sees "We couldn't confirm your order", the cart is locked, and **Try again** re-sends the same ticket and key. **Guarantee:** one key, at most one order, the same answer every time (50 parallel retries; end to end with a lost response).
 - *Cancel as the kitchen starts.* Each is one conditional `UPDATE`: cancel `WHERE id = @id AND status = 'NotStarted'`, kitchen `WHERE id = @id AND status = @expected`. SQLite serializes writers, so exactly one changes the row; the other updates 0 rows, re-reads and says why (409 "the kitchen has started this order", with the time). Updates add `If-Match` on the version. **Guarantee:** exactly one wins and the loser is told accurately (50 runs, service and HTTP; a naive read-then-write version is shown to let both succeed).
 
-**Cut, faked, and next.** I chose to build the core path only (decision UQ7). Designed, not built: half and quarter toppings (whole-pizza extra, 2x/3x, is built), crust/sauce upgrades and add-ons, item promos and BOGO, multi-level tax with tax classes, a kitchen timer, Docker Compose. Faked: the kitchen is an unauthenticated endpoint; the cart is an in-memory session; the browser DOM code is checked by a scripted headless-browser session rather than by the test suite. Next, in order: placement pricing (its test vectors are written), upgrades and add-ons, item promos and BOGO, multi-level tax, then Compose and the timer; longer-term directions are in plan section 9.4. **Timebox:** this went far past 3 hours: planning on 2026-10-27/28, then build commits from 07:25 to 15:42 on 10-28 (about 8 hours, AI-assisted), plus UI fixes after trying the app (to 16:16). In 3 hours I would keep the money model, quote-as-the-total, idempotent submit and conditional status updates, and drop the full schema, store overrides, time zones and most of the UI.
+**Cut, faked, and next.** I chose to build the core path only (decision UQ7). Designed, not built: half and quarter toppings (whole-pizza extra, 2x/3x, is built), crust/sauce upgrades and add-ons, item promos and BOGO, multi-level tax with tax classes, a kitchen timer, Docker Compose. Faked: the kitchen is an unauthenticated endpoint; the cart is an in-memory session; the browser DOM code is checked by a scripted headless-browser session rather than by the test suite. Next, in order: placement pricing (its test vectors are written), upgrades and add-ons, item promos and BOGO, multi-level tax, then Compose and the timer; longer-term directions are in plan section 9.4. **Timebox:** this went far past 3 hours: planning on 2026-10-27/28, then build commits from 07:25 to 15:42 on 10-28 (about 8 hours, AI-assisted), plus features and fixes requested after trying the app (extra toppings, a richer orders page, the kitchen page, the fantasy test database; to 17:13). In 3 hours I would keep the money model, quote-as-the-total, idempotent submit and conditional status updates, and drop the full schema, store overrides, time zones and most of the UI.
 
 ## Tests and invariants
 
@@ -198,7 +198,7 @@ Claude Code (Claude Opus 5.5) wrote most of the plan, the tests and the code und
 
 ## Status and cut list
 
-Built test-first, milestone by milestone (plan section 8; red test commits, then the implementation): **M0–M16 are done**, plus the core part of M15F.
+Built test-first, milestone by milestone (plan section 8; red test commits, then the implementation): **M0–M16 are done**, plus the core part of M15F and the requested additions below.
 
 | Milestone | What it adds |
 |---|---|
@@ -209,6 +209,7 @@ Built test-first, milestone by milestone (plan section 8; red test commits, then
 | M12–M14 | The order builder: typed client with safe retries, builder page with a server-computed running total, Review/Place with a sealed ticket, order page with live status, change, cancel, recent orders, lookup |
 | M15 | End-to-end flows with both real apps, and architecture rules |
 | M16 | This README: API, assumptions, design write-up, tests, AI note |
+| After M16 | Requested after trying the app: whole-pizza extra toppings 2x/3x, a visible promo list with Remove, a Review button that is disabled until the order can be placed (UQ29); status, date and summary on "Your orders"; the Kitchen page and its queue endpoint (UQ30); Bootstrap 5.1 badge colours |
 | M15F | Fantasy realm test database, core part: generator, `data/test/fantasy-realm.sql`, `--database fantasy` (side-by-side `pizzamagic-fantasy.db`). Extended part (multi-level tax, class rates, themed crusts and sauces) designed, not built |
 
 The designed-not-built list and future directions are in [Design write-up](#design-write-up) above and in plan section 9.4.
