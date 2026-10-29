@@ -158,12 +158,43 @@ public class DatabaseProfileTests
         (await client.GetAsync("/api/v1/menu?restaurantId=1003")).StatusCode.ShouldBe(sunspireMenu);
     }
 
-    [Fact]
-    public async Task Service_refuses_to_start_with_an_unknown_database()
+    // The real service, as a process: a bad --database stops startup with one clear line and exit code 2, not a stack
+    // trace; a valueless --database is refused too (the command-line provider would silently drop it: default database).
+    [Theory]
+    [InlineData("Unknown database 'dragons'", "--database", "dragons")]
+    [InlineData("--database needs a value: default or fantasy.", "--database")]
+    [InlineData("--database needs a value: default or fantasy.", "--database", "--urls", "http://localhost:5199")]
+    public async Task Service_refuses_to_start_with_a_bad_database_option(string message, params string[] args)
     {
-        await using var factory = new ProfileFactory("dragons");
+        var directory = Path.Combine(Path.GetTempPath(), "pizzamagic-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var start = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = directory,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        };
+        start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "PizzaMagic.OrderManager.dll"));
+        foreach (var arg in args)
+        {
+            start.ArgumentList.Add(arg);
+        }
+        start.Environment["ASPNETCORE_URLS"] = "http://127.0.0.1:0";
 
-        Should.Throw<DatabaseProfileException>(() => factory.CreateClient()).Message.ShouldContain("'dragons'");
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var stderr = process.StandardError.ReadToEndAsync();
+        var exited = process.WaitForExit(TimeSpan.FromSeconds(30));
+        if (!exited)
+        {
+            process.Kill(entireProcessTree: true);
+        }
+
+        exited.ShouldBeTrue("the service started instead of refusing the option");
+        process.ExitCode.ShouldBe(2);
+        var error = await stderr;
+        error.ShouldContain(message);
+        error.ShouldNotContain("   at ");   // no stack trace
+        File.Exists(Path.Combine(directory, "pizzamagic.db")).ShouldBeFalse();
     }
 
     /// <summary>The real service with a temp-file connection string from configuration and the given profile.</summary>

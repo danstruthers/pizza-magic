@@ -85,6 +85,47 @@ public class PricingPropertyTests
         Ok(draft).ShouldBeEquivalentTo(b);
     }
 
+    // An oracle written straight from the spec's table, sharing no code with the engine, so a wrong rate or rule can't
+    // pass by being consistent with itself: sizes $5/$7/$12; basic 8% and premium 11% of the size, per pizza; ILOVEPIZZA
+    // 10% before tax; SAVE5 $5 over $20 before tax; never both (the code entered first holds); tax 6.5% of the
+    // discounted total; tip in dollars or as a % of the bill. Half-up to whole cents at each step, before any x qty.
+    [Theory]
+    [MemberData(nameof(Drafts))]
+    public void Matches_an_independent_calculation_of_the_spec_rules(int seed, OrderDraft draft)
+    {
+        var sizePrice = new Dictionary<string, long> { ["SMALL"] = 500, ["MEDIUM"] = 700, ["LARGE"] = 1200 };
+        var premium = new HashSet<string> { "BACON", "CHICKEN", "GARLIC", "ARTICHOKE_HEARTS", "SUN_DRIED_TOMATOES", "PINEAPPLE" };
+        static long HalfUp(long numerator, long denominator) => (numerator * 2 + denominator) / (denominator * 2);
+
+        var subtotal = draft.LineItems.Sum(line =>
+        {
+            var size = sizePrice[line.SizeCode];
+            var toppings = line.Toppings.Sum(t => HalfUp(size * (premium.Contains(t.Code) ? 11 : 8), 100));
+            return (size + toppings) * line.Quantity;
+        });
+        var held = draft.PromoCodes.FirstOrDefault(c => c is "ILOVEPIZZA" or "SAVE5");
+        var discount = held switch
+        {
+            "ILOVEPIZZA" => HalfUp(subtotal * 10, 100),
+            "SAVE5" when subtotal > 2000 => 500,
+            _ => 0,
+        };
+        var tax = HalfUp((subtotal - discount) * 65, 1000);
+        var bill = subtotal - discount + tax;
+        var tip = draft.Tip.Mode switch
+        {
+            TipMode.Amount => draft.Tip.Value,
+            TipMode.Percent => HalfUp(bill * draft.Tip.Value, 1_000_000),
+            _ => 0,
+        };
+
+        var b = Ok(draft);
+
+        (b.Subtotal.Cents, b.Discount.Cents, b.Tax.Tax.Cents, b.Tip.Cents, b.Total.Cents)
+            .ShouldBe((subtotal, discount, tax, tip, bill + tip), $"draft {seed}");
+        b.Promotions.Outcomes.Count(o => o.Code is "ILOVEPIZZA" or "SAVE5" && o.Discount.Cents > 0).ShouldBeLessThanOrEqualTo(1);
+    }
+
     [Theory]
     [MemberData(nameof(Drafts))]
     public void Line_order_does_not_change_the_price(int seed, OrderDraft draft)

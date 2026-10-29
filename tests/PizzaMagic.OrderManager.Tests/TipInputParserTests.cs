@@ -13,6 +13,7 @@ public class TipInputParserTests
     [InlineData("Percent", "17.5", TipMode.Percent, 175_000)]
     [InlineData("Percent", "15", TipMode.Percent, 150_000)]
     [InlineData("Percent", "10.96", TipMode.Percent, 109_600)]
+    [InlineData("Amount", " 4.50 ", TipMode.Amount, 450)]   // trimmed, like promo and product codes
     public void Parses_amounts_to_cents_and_percents_to_ppm(string mode, string value, TipMode expectedMode, long expectedValue)
     {
         TipInputParser.Parse(new TipRequest(mode, value), out var error).ShouldBe(new TipInput(expectedMode, expectedValue));
@@ -32,10 +33,8 @@ public class TipInputParserTests
     [InlineData("-1")]
     [InlineData("1.234")]
     [InlineData("abc")]
-    [InlineData("")]
-    [InlineData(null)]
     [InlineData("1e3")]
-    [InlineData(" 4.50")]
+    [InlineData("4,50")]
     public void TipInputParser_rejects_negative_3dp_and_nonnumeric(string? value)
     {
         TipInputParser.Parse(new TipRequest("Amount", value), out var error);
@@ -52,10 +51,37 @@ public class TipInputParserTests
         error.Code.ShouldBe("TIP_INVALID");
     }
 
-    [Fact]
-    public void Absurdly_large_tip_is_out_of_range()
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData(null)]
+    public void Missing_value_asks_for_one(string? value)
     {
-        TipInputParser.Parse(new TipRequest("Amount", "999999999999999999999"), out var error);
+        TipInputParser.Parse(new TipRequest("Amount", value), out var error);
+
+        error.ShouldBe(new FieldError("tip.value", "TIP_INVALID", "Enter a tip, or choose No tip."));
+    }
+
+    // A value without a mode used to be silently dropped (no tip); it is an error, so a tip is never lost quietly.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("None")]
+    public void Value_without_a_mode_is_invalid(string? mode)
+    {
+        TipInputParser.Parse(new TipRequest(mode, "5"), out var error).ShouldBe(TipInput.None);
+
+        error.ShouldBe(new FieldError("tip.mode", "TIP_INVALID", "Choose Amount or Percent for the tip, or leave the tip empty."));
+    }
+
+    // Values too large for any limit are out of range, never an overflow (a 28-digit decimal x 100 used to throw: 500).
+    [Theory]
+    [InlineData("Amount", "999999999999999999999")]
+    [InlineData("Amount", "1000000000000000000000000000")]
+    [InlineData("Amount", "79228162514264337593543950335")]
+    [InlineData("Percent", "99999999999999999999999999.99")]
+    public void Absurdly_large_tip_is_out_of_range(string mode, string value)
+    {
+        TipInputParser.Parse(new TipRequest(mode, value), out var error);
 
         error!.Code.ShouldBe("TIP_OUT_OF_RANGE");
     }

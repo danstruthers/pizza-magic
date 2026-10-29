@@ -300,6 +300,27 @@ public class PricingEngineTests
             .Promotions.Outcomes[1].Status.ShouldBe(PromoStatus.LimitExceeded);
     }
 
+    // A code entered twice collapses; the duplicate must not block submitting (canSubmit used to be false).
+    [Fact]
+    public void Repeated_code_does_not_block_submit()
+    {
+        var breakdown = Ok(Price(Draft([LargePepBacon(2)], null, "SAVE5", " save5 ")));
+
+        breakdown.NormalizedDraft.PromoCodes.ShouldBe(["SAVE5"]);
+        breakdown.Discount.Cents.ShouldBe(500);
+        breakdown.CanSubmit.ShouldBeTrue();
+    }
+
+    // The limit message names the limit (spec: "a clear message to the customer").
+    [Fact]
+    public void Tip_limit_messages_name_the_limit()
+    {
+        Price(Draft([Pizza("SMALL")], Amount(50_001))).Errors.ShouldBe(
+            [new FieldError("tip.value", "TIP_OUT_OF_RANGE", "A dollar tip can be at most $500.00.")]);
+        Price(Draft([Pizza("SMALL")], Percent(1_000_001))).Errors.ShouldBe(
+            [new FieldError("tip.value", "TIP_OUT_OF_RANGE", "A percentage tip can be at most 100%.")]);
+    }
+
     // P26w / A69 as revised by UQ29: half and quarter toppings are designed but not built; extra (2x, 3x) is built.
     [Fact]
     public void Built_scope_rejects_partial_and_repeated_toppings()
