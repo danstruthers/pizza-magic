@@ -32,10 +32,27 @@ dotnet run --project src/PizzaMagic.Web             # order builder: http://loca
 
 On first start the order service creates `pizzamagic.db` next to its project, applies the seed scripts in `data/seed` (menu, Washington tax, ILOVEPIZZA / SAVE5, time zones) and validates the catalog; it refuses to start on invalid data. To reset, stop it and delete `src/PizzaMagic.OrderManager/pizzamagic.db*`. Ports come from each project's `Properties/launchSettings.json` (override with `--urls`). Docker Compose is designed but not built.
 
+**The fantasy realm test database (M15F).** A second, invented dataset (six restaurants in five made-up time zones, tax from 0% to 75%, a MYTHIC topping tier, realm promo codes) lives in its own file beside the normal one, and neither ever touches the other. Pick it with `--database`:
+
+```bash
+dotnet run --project src/PizzaMagic.OrderManager                        # default: pizzamagic.db (same as --database default)
+dotnet run --project src/PizzaMagic.OrderManager -- --database fantasy  # pizzamagic-fantasy.db: data/seed/*.sql + data/test/fantasy-realm.sql
+```
+
+`--database` is the configuration key `Seed:Profile`, so `--Seed:Profile=Fantasy` or the environment variable `Seed__Profile=Fantasy` also work. Any other value stops startup with a message. The service logs the profile and the database file it opened. If `ConnectionStrings:PizzaMagic` is set explicitly, that file is used instead, and the service refuses a file that already holds the other dataset. To reset the realm, delete `src/PizzaMagic.OrderManager/pizzamagic-fantasy.db*`.
+
+Pizza Magic (restaurant 1) is still the default restaurant there, with the spec menu. To shop at a realm restaurant, point the order builder at it with `OrderManager:RestaurantId`:
+
+```bash
+dotnet run --project src/PizzaMagic.Web -- --OrderManager:RestaurantId=1003   # Sunspire Ember Oven (75% tax, UTC+10:00)
+```
+
+Restaurants: 1001 Eldoria (8.875%, UTC−01:15), 1002 Dwarrowdeep (0%, UTC+04:15), 1003 Sunspire (75%, UTC+10:00), 1004 Mistmarsh (17.125%, UTC−07:45), 1005 Moonhollow (33.333%, shares Sunspire's zone), 1006 Frostholm (5%, UTC−02:15). Codes: MOONRISE, ARCHMAGE, HOARD, FORGE20 / DWARF20, FROSTFEAST (windows are in each restaurant's local time; see plan section 7.5). The file is generated: change `tools/PizzaMagic.FantasySeedGen`, then run `dotnet run --project tools/PizzaMagic.FantasySeedGen` from the repository root and delete the old fantasy database.
+
 Tests:
 
 ```bash
-dotnet test                          # about 2,060 .NET tests: pricing core, order service, order builder, end-to-end
+dotnet test                          # about 2,200 .NET tests: pricing core, order service, order builder, end-to-end
 node --test "tests/js/*.test.mjs"    # the two browser modules with logic (needs Node.js; keep the quotes)
 ```
 
@@ -168,7 +185,9 @@ A new *kind* of rule (say "2+ pizzas") is one new `IConditionEvaluator` class re
 
 I checked that the important tests can fail by temporarily breaking the code (banker's rounding, swapped tax methods, a cancel without the status condition, a missing idempotency guard, a stray `Math.Round`). Each break failed the expected tests, and was then reverted. The log is in `docs/ai-log.md`.
 
-**Not covered:** the browser DOM wiring (`order-builder.js`, `order-details.js`) has no automated browser test in the suite. Its logic modules have `node --test` tests, and the builder was driven end to end in headless Edge with a scripted session (add a pizza, extra toppings, apply and remove promos, Review enabling, review and place), but that script is not part of `dotnet test`. There is nothing for multi-process deployment (the database's unique key is the backstop there, but untested across processes), load, session scale-out, or accessibility. The designed-not-built features have test vectors written in the plan but no tests. The planned "fantasy realm" test database (M15F) is not built.
+**Not covered:** the browser DOM wiring (`order-builder.js`, `order-details.js`) has no automated browser test in the suite. Its logic modules have `node --test` tests, and the builder was driven end to end in headless Edge with a scripted session (add a pizza, extra toppings, apply and remove promos, Review enabling, review and place), but that script is not part of `dotnet test`. There is nothing for multi-process deployment (the database's unique key is the backstop there, but untested across processes), load, session scale-out, or accessibility. The designed-not-built features have test vectors written in the plan but no tests. The fantasy realm test database (M15F) covers only the core part: its multi-level tax, tax-class rates and themed crusts and sauces with upcharges need features that are designed, not built, and the startup validator still refuses that data.
+
+**Fantasy realm (M15F).** `FantasyRealmTests` runs the built features far outside the spec's single restaurant: the generated SQL must equal the generator's output; the catalog validates; every realm restaurant's menu, prices, policy and tax resolve; nine golden orders (F1–F9) pinned to the cent, computed independently by a Node script, cover 0% and 75% tax, both rounding methods where they differ (75% of 777 = 582.75 → 582 truncated; 8.875% of 875 = 77.66 → 78 half-up) and the MYTHIC tier on every size; a promo window opens at local midnight at each fixed offset to the millisecond, is open in one zone and closed in another at the same instant, and gives the same answer for the two restaurants sharing a zone; and the invariants (subtotal − discount + tax + tip = total, allocations sum to each discount, tax lines sum to the tax) hold over 560 generated orders across all seven restaurants. `DatabaseProfileTests` covers `--database`.
 
 Test projects: `tests/PizzaMagic.Domain.Tests` (pricing core), `tests/PizzaMagic.OrderManager.Tests` (API and persistence against a real temp-file SQLite), `tests/PizzaMagic.Web.Tests` (order builder with a scripted order service), `tests/PizzaMagic.EndToEnd.Tests` (both real apps in-process, plus the architecture rules) and `tests/js` (`node --test`).
 
@@ -178,7 +197,7 @@ Claude Code (Claude Opus 5.5) wrote most of the plan, the tests and the code und
 
 ## Status and cut list
 
-Built test-first, milestone by milestone (plan section 8; red test commits, then the implementation): **M0–M16 are done.**
+Built test-first, milestone by milestone (plan section 8; red test commits, then the implementation): **M0–M16 are done**, plus the core part of M15F.
 
 | Milestone | What it adds |
 |---|---|
@@ -189,7 +208,7 @@ Built test-first, milestone by milestone (plan section 8; red test commits, then
 | M12–M14 | The order builder: typed client with safe retries, builder page with a server-computed running total, Review/Place with a sealed ticket, order page with live status, change, cancel, recent orders, lookup |
 | M15 | End-to-end flows with both real apps, and architecture rules |
 | M16 | This README: API, assumptions, design write-up, tests, AI note |
-| M15F | Fantasy test database: **planned, not built** |
+| M15F | Fantasy realm test database, core part: generator, `data/test/fantasy-realm.sql`, `--database fantasy` (side-by-side `pizzamagic-fantasy.db`). Extended part (multi-level tax, class rates, themed crusts and sauces) designed, not built |
 
 The designed-not-built list and future directions are in [Design write-up](#design-write-up) above and in plan section 9.4.
 
@@ -201,8 +220,9 @@ src/PizzaMagic.Contracts/     shared request/response types and formatters
 src/PizzaMagic.OrderManager/  order service (Web API, EF Core + SQLite, seed runner)
 src/PizzaMagic.Web/           order builder (MVC, Session cart, typed client)
 data/seed/                    the menu, tax, promos and time zones, as SQL
+data/test/                    the generated fantasy realm test data (applied only with --database fantasy)
 tests/                        one test project per app, end-to-end tests, JS tests
-tools/                        time zone seed generator, logo and favicon generators
+tools/                        time zone and fantasy realm seed generators, logo and favicon generators
 docs/DEVELOPMENT_PLAN.md      design, assumptions (section 3), decisions (section 10), milestones (section 8)
 docs/ai-log.md                running log of AI use, rejected output and hand verification
 ```

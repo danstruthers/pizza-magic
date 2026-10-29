@@ -173,3 +173,37 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 **Process note:** a running copy of the web app (not started by the agent) locked `bin/`, so the tests were built with `--artifacts-path` into a temp folder instead of stopping it. That made the architecture tests fail (they found the repository by walking up from their output folder); `Repository` now falls back to its own source file's location, which is a real robustness fix, not a test change to make things pass.
 
 **Verified rather than trusted:** red first (2 tests), then all 2,082 .NET tests green; in headless Edge against the new build on spare ports with a scratch database: two orders placed, one started by the kitchen, and the page showed "Started | Placed Oct 28, 2026, 4:37 PM PDT | $13.34 | 1 x Large pizza with Pepperoni 2x | ILOVEPIZZA −$1.39" and "Not Started | … | $5.91 | 1 x Small pizza with Bacon".
+
+## 2026-10-28: M15F fantasy realm test database (core part) and `--database`
+
+**Requested by the user:** build the M15F fantasy database in a parallel thread, let the default and fantasy databases sit side by side, and add an OrderManager command-line option to load the fantasy one, defaulting to the normal database. Done by a Claude Code agent in its own git worktree.
+
+**Process notes and fixed AI output:**
+- The agent's worktree branch had been cut from an early scaffold commit (`0cab417`), not from `main`. It had no work of its own yet, so it was moved to `main`'s tip before starting.
+- The first draft of golden F2 entered HOARD and FORGE20 together. They share the exclusion group `REALM_FEAST`, so that is a conflict, not a priced golden. F2 became FORGE20 + ILOVEPIZZA (it still shows FORGE20's $4 cap), and the conflict got its own test.
+- None of the first goldens had a tax fraction where HALF_UP and TRUNCATE give different cents, so "both rounding methods" would have passed with either method. F7–F9 were added to cover that (582.75 → 582 truncated, 77.656 → 78 half-up, 149.844 → 149 truncated).
+- The red commit's shared test fixture threw a NullReferenceException on cleanup when the database failed to initialize, which hid the real failure. It now disposes only what it created.
+
+**Decisions to confirm:**
+- File name `pizzamagic-fantasy.db`, not the plan's earlier `fantasy.db`, so the two files sort together beside each other.
+- `ConnectionStrings:PizzaMagic` was removed from `appsettings.json`, so the profile can choose the file. An explicit connection string still wins, and the profile then only picks the scripts. To keep that from mixing the datasets, the seed runner refuses a database whose `data_script_log` shows the other profile.
+- The realm's ids start at 1001, so later core seed scripts (which a fantasy database also applies) don't collide with them.
+
+**Independent arithmetic (Node, BigInt, written from the plan's rules, not from the C# code).** Topping = round half-up(base × tier rate); discounts applied in (priority, id) order on what remains; tax = taxable × rate, rounded by the jurisdiction's method; tip = round half-up(bill × percent):
+- F1 Eldoria (8.875% HALF_UP): 2 × (Large 1350 + Dragon-fire 337.5→338 + Kraken 148.5→149) = 3674; Giant 1999 + Goblin 159.92→160 + Unicorn 499.75→500 = 2659; S 6333; ARCHMAGE 30% = 1899.9→1900; taxable 4433; tax 393.428→393; bill 4826; tip 15% 723.9→724; **5550**.
+- F2 Dwarrowdeep (0%): 3 × (Medium 777 + Griffin 85.47→85 ×2 + Phoenix 194.25→194) = 3423; ILOVEPIZZA 342.3→342; FORGE20 20% of 3081 = 616.2→616, capped 400; taxable 2681; tax 0; tip $5.00; **3181**.
+- F3 Sunspire (75% TRUNCATE): Small 450 + Dragon-fire 112.5→113 ×2 = 676; Giant 2222 + Phoenix 556 + Unicorn 556 = 3334; S 4010; MOONRISE 15% 601.5→602; taxable 3408; tax 2556.000; bill 5964; tip 12.5% 745.5→746; **6710**.
+- F4 Mistmarsh (17.125% TRUNCATE): 2 × (Large 1275 + Elven 102 + Bacon 140.25→140 + Phoenix 318.75→319) = 3672; ARCHMAGE 1101.6→1102; taxable 2570; tax 440.112→440; **3010**.
+- F5 Moonhollow (33.333% HALF_UP): 4 × (Medium 725 + Unicorn 181.25→181) = 3624; Small 500 + Dragon-fire 125 = 625; S 4249; ILOVEPIZZA (id 1) 424.9→425, then MOONRISE 15% of 3824 = 573.6→574; taxable 3250; tax 1083.322→1083; bill 4333; tip 17.5% 758.275→758; **5091**.
+- F6 Frostholm (5% HALF_UP): Giant 1875 + Kraken 206.25→206 + Phoenix 468.75→469 = 2550; Medium 700 + Goblin 56 = 756; S 3306; FROSTFEAST (priority 50) 500, then ILOVEPIZZA 10% of 2806 = 280.6→281; taxable 2525; tax 126.25→126; bill 2651; tip 20% 530.2→530; **3181**.
+- F7 Sunspire: Medium 700 + Griffin 77 = 777; tax 582.75→**582** (half-up would be 583); **1359**. F8 Eldoria: Medium 700 + Phoenix 175 = 875; tax 77.656→**78** (truncation would be 77); **953**. F9 Mistmarsh: 875; tax 149.844→**149** (half-up would be 150); **1024**.
+- MYTHIC grid (25%): Eldoria 125/175/338/500, Dwarrowdeep 125/194/300/600, Sunspire 113/175/300/556, Mistmarsh 175/319/500 (no Small), Moonhollow 125/181/300 (no Giant), Frostholm 125/175/300/469.
+- Windows, UTC = local − offset: MOONRISE opens at local 2026-10-28 00:00 at 07:00Z (Pizza Magic, PDT), 01:15Z (Eldoria), 19:45Z on the 27th (Dwarrowdeep), 14:00Z on the 27th (Sunspire and Moonhollow), 07:45Z (Mistmarsh) and 02:15Z (Frostholm). So at 19:00Z on the 27th it is open only in the Sunspire zone.
+- The zone offsets were also drawn independently by a Node SplitMix64 with the same seed: −75, 255, 600, −465, −135, identical to the C# generator.
+
+**Verified rather than trusted:**
+- Red first: 115 new tests, 112 failing on the stubs or the unwired profile. The other 3 checked that today's default behavior was unchanged. Then green: 2,197 .NET tests (from 2,082) and 15 JS tests. The three `Extended_part_is_still_refused` rows, added with the implementation, bring the total to 2,200.
+- Mutation: Sunspire's rounding changed to HALF_UP in the generator without regenerating failed exactly `Committed_fantasy_realm_equals_generator_output`. After regenerating, F7 and Sunspire's tax-resolution row failed, while F3 (an exact 2556.000) correctly did not. Making the default profile also apply the fantasy script failed 11 tests, including the four aimed at it and the existing seed and menu tests. Removing the cross-profile guard failed the two refusal tests. Each change was reverted with an explicit edit, and the file was regenerated and checked.
+- Live, on spare ports: `--database fantasy` logged `Database profile Fantasy: …\src\PizzaMagic.OrderManager\pizzamagic-fantasy.db`. Sunspire's menu showed Small $4.50, Giant's feast $22.22, MYTHIC at 113/175/300/556 and no Kraken. A live quote of Medium + Griffin sausage with MOONRISE came to 777 − 117 + 495 = 1155. The order builder with `OrderManager:RestaurantId=1003` rendered Sunspire's menu. Without the option, the service logged `pizzamagic.db` in the same folder, served Pizza Magic and returned 404 for restaurant 1003. `--database dragons` stopped startup with "Unknown database 'dragons'. Use --database default … or --database fantasy …". The scratch databases were deleted, and only the processes the agent started were stopped.
+
+**Not built (extended part of section 7.5):** multi-level jurisdictions with COMBINED/PER_LEVEL scope, a tax-class (POTION) rate, and themed crusts and sauces with fixed or size-scaled upcharges. The built validator refuses each of them (A70), and `Extended_part_is_still_refused` pins that on the fantasy database. They arrive with M4 EXT and X2 + UQ20.
