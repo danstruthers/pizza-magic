@@ -6,7 +6,9 @@ namespace PizzaMagic.Web.Models.Session;
 /// <summary>
 /// The customer's cart, kept in the ASP.NET Core Session (plan section 6.2). <see cref="Revision"/> is incremented by
 /// the page on every edit, so an older draft never overwrites a newer one (best effort; Place uses a review ticket,
-/// never this cart, M14). The submission key and edit fields are used by checkout (M14).
+/// never this cart, M14). The submission key and edit fields are used by checkout (M14). An order being changed is
+/// priced at its own restaurant and channel; <see cref="LastPlacedOrderId"/> keeps the last order findable even if
+/// the response that placed it never reached the browser.
 /// </summary>
 public sealed record CartState(
     long Revision,
@@ -17,9 +19,16 @@ public sealed record CartState(
     long KeyRevision,
     string? PendingTicket = null,
     Guid? EditingOrderId = null,
-    int? EditingVersion = null)
+    int? EditingVersion = null,
+    long? EditingRestaurantId = null,
+    string? EditingChannel = null,
+    Guid? LastPlacedOrderId = null)
 {
-    public static CartState Empty() => new(0, [], [], null, Guid.NewGuid().ToString(), 0);
+    public static CartState Empty(Guid? lastPlacedOrderId = null) =>
+        new(0, [], [], null, Guid.NewGuid().ToString(), 0, LastPlacedOrderId: lastPlacedOrderId);
+
+    /// <summary>The restaurant to price at: the changed order's own, else the one this web app sells for.</summary>
+    public long? RestaurantId(IConfiguration configuration) => EditingRestaurantId ?? Clients.ConfiguredRestaurant.Id(configuration);
 }
 
 /// <summary>Reads and writes the cart as JSON in the Session.</summary>

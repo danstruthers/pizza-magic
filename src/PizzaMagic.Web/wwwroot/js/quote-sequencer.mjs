@@ -5,9 +5,12 @@
  * Sends quote requests for the latest draft:
  * - debounced (250 ms by default),
  * - at most one request in flight per tab; edits made meanwhile coalesce into the latest draft,
- * - only the response for the newest draft is applied (an older one is never shown).
+ * - only the response for the newest draft is applied (an older one is never shown),
+ * - an unavailable total (no connection, or a 5xx) is retried with the same draft after retryMs (5 s by default).
  */
-export function createQuoteSequencer({ send, onResponse, debounceMs = 250, setTimer = setTimeout, clearTimer = clearTimeout, onBusyChange = () => {} }) {
+export function createQuoteSequencer({
+  send, onResponse, debounceMs = 250, retryMs = 5000, setTimer = setTimeout, clearTimer = clearTimeout, onBusyChange = () => {},
+}) {
   let latest = 0;          // sequence number of the newest draft requested
   let pending = null;      // the newest draft not yet sent
   let inFlight = false;
@@ -36,8 +39,12 @@ export function createQuoteSequencer({ send, onResponse, debounceMs = 250, setTi
       inFlight = false;
     }
     if (job.seq === latest) {
+      onBusyChange(false);   // before drawing, so the drawing (e.g. a greyed stale total) has the last word
       onResponse(response, job.draft);
-      onBusyChange(false);
+      if (response.status === 0 || response.status >= 500) {
+        // The total really is retried: the same draft again after retryMs, unless a newer edit replaces it first.
+        timer = setTimer(() => request(job.draft), retryMs);
+      }
     } else if (pending !== null) {
       flush();   // a newer draft arrived while this one was in flight: send it now
     }

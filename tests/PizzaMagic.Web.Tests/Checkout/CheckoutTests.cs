@@ -214,7 +214,8 @@ public class CheckoutTests
     {
         await using var factory = new WebFactory();
         factory.OrderManager.Quote = _ => Priced(1380);
-        factory.OrderManager.Submit = (_, _) => ApiResult<OrderResponse>.Unavailable("timeout");
+        // A definitive refusal each time (refusals are never stored by the service), so no Place leaves the cart locked.
+        factory.OrderManager.Submit = (_, _) => ApiResult<OrderResponse>.Failed(Problems.Of(ProblemTypes.Validation, 422));
         var client = await CartAsync(factory);
         var first = await WebFactory.ReviewAsync(client);
         var again = await WebFactory.ReviewAsync(client);

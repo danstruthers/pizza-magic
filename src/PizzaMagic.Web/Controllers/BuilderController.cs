@@ -17,8 +17,8 @@ public sealed class BuilderController(IOrderManagerClient orderManager, IConfigu
     [HttpGet("/")]
     public async Task<IActionResult> Index()
     {
-        var menu = await orderManager.GetMenuAsync(RestaurantId(), HttpContext.RequestAborted);
         var cart = CartStore.Load(HttpContext.Session);
+        var menu = await orderManager.GetMenuAsync(cart.RestaurantId(configuration), HttpContext.RequestAborted);
         return View(new BuilderViewModel(menu.IsSuccess ? menu.Value : null, cart));
     }
 
@@ -28,8 +28,12 @@ public sealed class BuilderController(IOrderManagerClient orderManager, IConfigu
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Quote([FromBody] BuilderDraft draft)
+    public async Task<IActionResult> Quote([FromBody] BuilderDraft? draft)
     {
+        if (draft is null)
+        {
+            return BadRequest();
+        }
         var cart = CartStore.Load(HttpContext.Session);
         // While an order waits for confirmation the cart is locked: drafts are still priced, never saved.
         var isNewest = cart.PendingTicket is null && draft.Revision > cart.Revision;
@@ -45,7 +49,8 @@ public sealed class BuilderController(IOrderManagerClient orderManager, IConfigu
         }
 
         var result = await orderManager.QuoteAsync(
-            new QuoteRequest(RestaurantId(), null, draft.LineItems ?? [], draft.PromoCodes ?? [], draft.Tip), HttpContext.RequestAborted);
+            new QuoteRequest(cart.RestaurantId(configuration), cart.EditingChannel, draft.LineItems ?? [], draft.PromoCodes ?? [], draft.Tip),
+            HttpContext.RequestAborted);
 
         if (result.IsSuccess && isNewest)
         {
@@ -59,7 +64,8 @@ public sealed class BuilderController(IOrderManagerClient orderManager, IConfigu
         return result.Kind switch
         {
             ApiResultKind.Success => Ok(result.Value),
-            ApiResultKind.Problem => StatusCode(result.Problem!.Status, new { type = result.Problem.Type, errors = result.Problem.Errors }),
+            ApiResultKind.Problem => StatusCode(result.Problem!.Status,
+                new { type = result.Problem.Type, errors = result.Problem.Errors, message = result.Problem.Detail ?? result.Problem.Title }),
             _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = UnavailableMessage }),
         };
     }
@@ -73,9 +79,7 @@ public sealed class BuilderController(IOrderManagerClient orderManager, IConfigu
         {
             return Redirect("/Checkout");
         }
-        CartStore.Save(HttpContext.Session, CartState.Empty());
+        CartStore.Save(HttpContext.Session, CartState.Empty(CartStore.Load(HttpContext.Session).LastPlacedOrderId));
         return Redirect("/");
     }
-
-    private long? RestaurantId() => ConfiguredRestaurant.Id(configuration);
 }

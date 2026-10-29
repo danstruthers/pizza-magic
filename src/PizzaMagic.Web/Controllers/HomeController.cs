@@ -7,13 +7,6 @@ namespace PizzaMagic.Web.Controllers;
 /// <summary>The error page. The home page is the order builder (<see cref="BuilderController"/>).</summary>
 public class HomeController : Controller
 {
-    private readonly ILogger<HomeController> _logger;
-
-    public HomeController(ILogger<HomeController> logger)
-    {
-        _logger = logger;
-    }
-
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {

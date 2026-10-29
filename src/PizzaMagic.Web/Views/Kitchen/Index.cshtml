@@ -3,8 +3,10 @@
     ViewData["Title"] = "Kitchen";
 }
 
-@* Simple auto-refresh so new orders appear; each button still sends the status it was drawn with. *@
-<meta http-equiv="refresh" content="15" />
+@section Head {
+    @* Simple auto-refresh so new orders appear; each button still sends the status it was drawn with. *@
+    <meta http-equiv="refresh" content="15" />
+}
 
 <div class="d-flex flex-wrap align-items-baseline gap-3">
     <h1 class="h3 mb-0">Kitchen</h1>

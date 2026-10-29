@@ -40,6 +40,7 @@
             {
                 <form method="post" action="@url/Cancel" data-action="cancel" onsubmit="return confirm('Cancel this order?')">
                     @Html.AntiForgeryToken()
+                    <input type="hidden" name="version" value="@order.Version" />
                     <button type="submit" class="btn btn-outline-danger">Cancel order</button>
                 </form>
             }
@@ -69,7 +70,10 @@
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-6 fw-normal">Subtotal</dt><dd class="col-6 text-end">@Display.Money(pricing.SubtotalCents)</dd>
-                    <dt class="col-6 fw-normal">Discounts</dt><dd class="col-6 text-end">−@Display.Money(pricing.DiscountCents)</dd>
+                    @if (pricing.DiscountCents > 0)
+                    {
+                        <dt class="col-6 fw-normal">Discounts</dt><dd class="col-6 text-end">−@Display.Money(pricing.DiscountCents)</dd>
+                    }
                     <dt class="col-6 fw-normal">Tax</dt><dd class="col-6 text-end">@Display.Money(pricing.TaxCents)</dd>
                     <dt class="col-6 fw-normal">Tip</dt><dd class="col-6 text-end">@Display.Tip(pricing.Tip)</dd>
                     <dt class="col-6 fs-5">Total</dt><dd class="col-6 text-end fs-5 fw-bold">@Display.Money(pricing.TotalCents)</dd>

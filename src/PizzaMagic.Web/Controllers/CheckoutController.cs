@@ -25,7 +25,8 @@ public sealed class CheckoutController(
     private const string PricesChanged = "Prices changed — please confirm the new total.";
     private const string TicketInvalid = "This order page has expired or was changed. Please review your order again.";
     private const string QuoteUnavailable = "We can't price your order right now. Please try again in a moment.";
-    private const string ChangedElsewhere = "This order was changed in another window. Here's the latest version.";
+    internal const string ChangedElsewhere = "This order was changed in another window. Here's the latest version.";
+    private const string EarlierOrderPending = "Your earlier order is still waiting for confirmation. Try it again before placing another.";
 
     [HttpGet("/Checkout")]
     public async Task<IActionResult> Review()
@@ -55,7 +56,7 @@ public sealed class CheckoutController(
         }
 
         var result = await orderManager.QuoteAsync(
-            new QuoteRequest(ConfiguredRestaurant.Id(configuration), null, cart.LineItems, cart.PromoCodes, cart.Tip),
+            new QuoteRequest(cart.RestaurantId(configuration), cart.EditingChannel, cart.LineItems, cart.PromoCodes, cart.Tip),
             HttpContext.RequestAborted);
         if (!result.IsSuccess)
         {
@@ -80,22 +81,35 @@ public sealed class CheckoutController(
             return View(nameof(Review), CheckoutViewModel.Message(TicketInvalid));
         }
 
-        // Until the service gives a definitive answer the cart is locked and this ticket is the only way forward.
-        var cart = CartStore.Load(HttpContext.Session) with { PendingTicket = ticket };
+        // An order already waiting for confirmation wins: placing another ticket (an older Review page) could create
+        // a second order nobody sees. Only Try again (the same ticket and key) moves on.
+        var cart = CartStore.Load(HttpContext.Session);
+        if (cart.PendingTicket is { } pending && pending != ticket && tickets.TryUnprotect(pending) is { } pendingReview)
+        {
+            Response.StatusCode = StatusCodes.Status409Conflict;
+            return View(nameof(Review), Pending(pending, pendingReview) with { Banner = EarlierOrderPending });
+        }
+
+        // Lock first, and store the lock before the order service hears of the order, so a dropped connection can't
+        // leave an unlocked cart behind an order that may exist. The call itself isn't tied to the browser either:
+        // once sent it gets a definitive answer (the client's timeouts bound it), whether or not the phone is still there.
+        cart = cart with { PendingTicket = ticket };
+        CartStore.Save(HttpContext.Session, cart);
+        await HttpContext.Session.CommitAsync();
         var draft = review.Draft;
         var result = review.OrderId is { } orderId
             ? await orderManager.UpdateAsync(orderId, review.Version!.Value,
                 new UpdateOrderRequest(draft.LineItems, draft.PromoCodes, draft.Tip, review.ExpectedTotalCents, null),
-                review.SubmissionKey, HttpContext.RequestAborted)
+                review.SubmissionKey, CancellationToken.None)
             : await orderManager.SubmitAsync(
                 new SubmitOrderRequest(ConfiguredRestaurant.Id(configuration), draft.Channel, draft.LineItems, draft.PromoCodes, draft.Tip,
                     review.ExpectedTotalCents, null),
-                review.SubmissionKey, HttpContext.RequestAborted);
+                review.SubmissionKey, CancellationToken.None);
 
         if (result.IsSuccess)
         {
-            CartStore.Save(HttpContext.Session, CartState.Empty());
             var placed = Guid.Parse(result.Value!.OrderId);
+            CartStore.Save(HttpContext.Session, CartState.Empty(placed));
             recentOrders.Add(HttpContext, placed);
             return Redirect($"/Orders/{placed}");
         }
@@ -116,7 +130,7 @@ public sealed class CheckoutController(
 
             case ProblemTypes.VersionMismatch or ProblemTypes.OrderNotModifiable when review.OrderId is { } changed:
                 // The edit can't be applied: leave edit mode and show the order as it is now.
-                CartStore.Save(HttpContext.Session, CartState.Empty());
+                CartStore.Save(HttpContext.Session, CartState.Empty(cart.LastPlacedOrderId));
                 TempData[NoticeKey] = problem.Type == ProblemTypes.VersionMismatch ? ChangedElsewhere : KitchenStarted;
                 return Redirect($"/Orders/{changed}");
 

@@ -21,7 +21,13 @@ public sealed class KitchenController(IOrderManagerClient orderManager, IConfigu
         return View(new KitchenViewModel(
             result.IsSuccess ? result.Value!.Orders : null,
             TempData[NoticeKey] as string,
-            result.IsSuccess ? null : "Can't reach the order service right now. This page will try again shortly."));
+            result.Kind switch
+            {
+                ApiResultKind.Success => null,
+                ApiResultKind.Problem when result.Problem!.Type == ProblemTypes.RestaurantNotFound =>
+                    "This kitchen's restaurant doesn't exist. Check OrderManager:RestaurantId.",
+                _ => "Can't reach the order service right now. This page will try again shortly.",
+            }));
     }
 
     [HttpPost("/Kitchen/{id:guid}/Advance")]

@@ -12,7 +12,7 @@ namespace PizzaMagic.Web.Clients;
 /// Typed access to the order service over HTTP. Business refusals come back as problems and transport failures as
 /// Unavailable; neither throws to a controller. Only the caller's own cancellation propagates.
 /// </summary>
-public sealed class OrderManagerClient(IHttpClientFactory factory) : IOrderManagerClient
+public sealed class OrderManagerClient(IHttpClientFactory factory, ILogger<OrderManagerClient> logger) : IOrderManagerClient
 {
     public const string ClientName = "OrderManager";
     public const string QuotesClientName = "OrderManagerQuotes";
@@ -45,8 +45,11 @@ public sealed class OrderManagerClient(IHttpClientFactory factory) : IOrderManag
             },
             cancellationToken);
 
+    // Cancelled orders stay cancelled, so a retry is safe; If-Match makes a stale page's cancel a 412, not a surprise.
     public Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, int? version, CancellationToken cancellationToken) =>
-        SendAsync<OrderResponse>(ClientName, HttpMethod.Post, $"/api/v1/orders/{orderId}/cancel", null, null, cancellationToken);
+        SendAsync<OrderResponse>(ClientName, HttpMethod.Post, $"/api/v1/orders/{orderId}/cancel", null,
+            version is { } v ? message => message.Headers.TryAddWithoutValidation("If-Match", $"\"{v}\"") : null,
+            cancellationToken);
 
     public Task<ApiResult<KitchenQueueResponse>> GetKitchenQueueAsync(long? restaurantId, CancellationToken cancellationToken) =>
         SendAsync<KitchenQueueResponse>(ClientName, HttpMethod.Get,
@@ -72,7 +75,12 @@ public sealed class OrderManagerClient(IHttpClientFactory factory) : IOrderManag
         try
         {
             using var response = await factory.CreateClient(clientName).SendAsync(request, cancellationToken);
-            return await ReadAsync<T>(response, cancellationToken);
+            var result = await ReadAsync<T>(response, cancellationToken);
+            if (result.Kind == ApiResultKind.Unavailable)
+            {
+                logger.LogWarning("Order service unavailable: {Method} {Path}: {Reason}", method, path, result.UnavailableReason);
+            }
+            return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -81,6 +89,7 @@ public sealed class OrderManagerClient(IHttpClientFactory factory) : IOrderManag
         catch (Exception e) when (e is HttpRequestException or TimeoutRejectedException or BrokenCircuitException
                                      or OperationCanceledException or JsonException)
         {
+            logger.LogWarning(e, "Order service unavailable: {Method} {Path}", method, path);
             return ApiResult<T>.Unavailable(e.Message);
         }
     }

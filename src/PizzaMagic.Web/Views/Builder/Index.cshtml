@@ -33,6 +33,12 @@ else if (Model.Cart.EditingOrderId is { } editing)
         </form>
     </div>
 }
+else if (Model.Cart.LastPlacedOrderId is { } placed)
+{
+    <div class="alert alert-success" role="status">
+        Your order @placed.ToString()[..8] was placed. <a href="/Orders/@placed" class="alert-link">See its status</a>
+    </div>
+}
 
 <div id="builder" data-menu="@Model.MenuJson" data-cart="@Model.CartJson">
     @Html.AntiForgeryToken()
@@ -62,7 +68,7 @@ else if (Model.Cart.EditingOrderId is { } editing)
                     <button type="button" class="btn btn-outline-secondary tip-none">No tip</button>
                     @foreach (var preset in menu.Policy.TipPresetsPpm)
                     {
-                        <button type="button" class="btn btn-outline-secondary tip-preset" data-percent="@(preset / 10000m)">@BuilderViewModel.Percent(preset)</button>
+                        <button type="button" class="btn btn-outline-secondary tip-preset" aria-pressed="false" data-percent="@((preset / 10000m).ToString(System.Globalization.CultureInfo.InvariantCulture))">@BuilderViewModel.Percent(preset)</button>
                     }
                     <select id="tip-mode" class="form-select w-auto" aria-label="Tip type">
                         <option value="Percent">%</option>
@@ -78,8 +84,8 @@ else if (Model.Cart.EditingOrderId is { } editing)
             <div id="total-panel" class="card shadow-sm position-sticky" style="top: 1rem">
                 <div class="card-body">
                     <h2 class="h5 card-title">Your order</h2>
-                    <div id="total-status" class="small text-muted mb-2">Add a pizza to see your total.</div>
-                    <dl class="row mb-0 small" id="totals">
+                    <div id="total-status" class="small text-muted mb-2" aria-live="polite">Add a pizza to see your total.</div>
+                    <dl class="row mb-0 small" id="totals" aria-live="polite" aria-atomic="true">
                         <dt class="col-6 fw-normal">Subtotal</dt><dd class="col-6 text-end" data-total="subtotal">—</dd>
                         <dt class="col-6 fw-normal">Discounts</dt><dd class="col-6 text-end" data-total="discount">—</dd>
                         <dd class="col-12 small text-success mb-1" id="discount-lines"></dd>
@@ -103,9 +109,11 @@ else if (Model.Cart.EditingOrderId is { } editing)
 <template id="line-template">
     <div class="card line">
         <div class="card-body">
+            <h2 class="h6 line-title">Pizza</h2>
             <div class="d-flex flex-wrap gap-2 align-items-end">
                 <div>
-                    <label class="form-label small mb-0">Size</label>
+                    @* The script gives each line's controls ids and points these labels at them. *@
+                    <label class="form-label small mb-0 size-label">Size</label>
                     <select class="form-select size" data-field="sizeCode">
                         @foreach (var size in menu.Sizes)
                         {
@@ -114,7 +122,7 @@ else if (Model.Cart.EditingOrderId is { } editing)
                     </select>
                 </div>
                 <div>
-                    <label class="form-label small mb-0">Quantity</label>
+                    <label class="form-label small mb-0 quantity-label">Quantity</label>
                     <input type="number" class="form-control quantity" data-field="quantity" min="1" max="@menu.Policy.MaxLineQuantity" value="1" style="width: 6rem" />
                 </div>
                 <button type="button" class="btn btn-outline-danger ms-auto remove-line">Remove</button>

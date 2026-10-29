@@ -75,7 +75,7 @@ public class BuilderTests
 
         var html = await factory.CreateClient().GetStringAsync("/");
 
-        System.Text.RegularExpressions.Regex.IsMatch(html, "id=\"total-panel\"[^>]*aria-live=\"polite\"").ShouldBeTrue();
+        System.Text.RegularExpressions.Regex.IsMatch(html, "id=\"totals\"[^>]*aria-live=\"polite\"").ShouldBeTrue();
         System.Text.RegularExpressions.Regex.IsMatch(html, "class=\"[^\"]*tip-preset[^\"]*\"[^>]*aria-pressed=\"false\"").ShouldBeTrue();
     }
 

@@ -75,7 +75,10 @@
                 <div class="card-body">
                     <dl class="row mb-0">
                         <dt class="col-6 fw-normal">Subtotal</dt><dd class="col-6 text-end">@Display.Money(quote.SubtotalCents)</dd>
-                        <dt class="col-6 fw-normal">Discounts</dt><dd class="col-6 text-end">−@Display.Money(quote.DiscountCents)</dd>
+                        @if (quote.DiscountCents > 0)
+                        {
+                            <dt class="col-6 fw-normal">Discounts</dt><dd class="col-6 text-end">−@Display.Money(quote.DiscountCents)</dd>
+                        }
                         <dt class="col-6 fw-normal">Tax</dt><dd class="col-6 text-end">@Display.Money(quote.TaxCents)</dd>
                         <dt class="col-6 fw-normal">Tip</dt><dd class="col-6 text-end">@Display.Tip(quote.Tip)</dd>
                         <dt class="col-6 fs-5">Total</dt><dd class="col-6 text-end fs-5 fw-bold">@Display.Money(quote.TotalCents)</dd>

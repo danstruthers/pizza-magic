@@ -25,7 +25,6 @@ if (root) {
     })),
     promoCodes: [...(saved.promoCodes ?? [])],
     tip: saved.tip ?? null,
-    lastView: null,
   };
 
   const sequencer = createQuoteSequencer({
@@ -40,9 +39,10 @@ if (root) {
       return { status: response.status, body };
     },
     onResponse: (response) => render(reduceQuote(response)),
+    // Only the busy side: when the answer arrives, render() decides whether the total is current or stale.
     onBusyChange: (busy) => {
-      totalPanel.classList.toggle('opacity-50', busy);
       if (busy) {
+        totalPanel.classList.add('opacity-50');
         statusEl.textContent = 'updating…';
         reviewEl.disabled = true;   // the shown total is out of date until the next quote says otherwise
       }
@@ -77,10 +77,15 @@ if (root) {
     state.lines.forEach((line, index) => {
       const node = template.content.firstElementChild.cloneNode(true);
       node.dataset.index = index;
+      node.querySelector('.line-title').textContent = `Pizza ${index + 1}`;
       const size = node.querySelector('.size');
+      size.id = `size-${index}`;
+      node.querySelector('.size-label').htmlFor = size.id;
       size.value = line.sizeCode;
       size.addEventListener('change', () => { line.sizeCode = size.value; updateToppingPrices(node, line); changed(); });
       const quantity = node.querySelector('.quantity');
+      quantity.id = `quantity-${index}`;
+      node.querySelector('.quantity-label').htmlFor = quantity.id;
       quantity.value = line.quantity;
       quantity.addEventListener('change', () => { line.quantity = Number.parseInt(quantity.value, 10) || 0; changed(); });
       node.querySelectorAll('.topping').forEach((box) => {
@@ -107,6 +112,9 @@ if (root) {
       node.querySelector('.remove-line').addEventListener('click', () => {
         state.lines.splice(index, 1);
         renderLines();
+        // Keep keyboard focus nearby: the pizza that took this one's place, else the last one, else "Add a pizza".
+        const next = linesEl.children[Math.min(index, state.lines.length - 1)];
+        (next?.querySelector('.size') ?? document.getElementById('add-line')).focus();
         changed();
       });
       updateToppingPrices(node, line);
@@ -209,17 +217,26 @@ if (root) {
   function setTip() {
     const value = tipValue.value.trim();
     state.tip = value === '' ? null : { mode: tipMode.value, value };
+    showPressedPreset();
     changed();
+  }
+  // The preset matching the current tip is shown (and announced) as pressed.
+  function showPressedPreset() {
+    document.querySelectorAll('.tip-preset').forEach((button) => {
+      const pressed = state.tip?.mode === 'Percent' && Number(state.tip.value) === Number(button.dataset.percent);
+      button.setAttribute('aria-pressed', String(pressed));
+      button.classList.toggle('active', pressed);
+    });
   }
   if (state.tip) {
     tipMode.value = state.tip.mode;
     tipValue.value = state.tip.value;
   }
+  showPressedPreset();
 
   // ---- totals ----
 
   function render(view) {
-    state.lastView = view;
     if (view.promoCodes) state.promoCodes = view.promoCodes;   // the server's normalized list replaces the cart's
     totalPanel.classList.toggle('opacity-50', view.stale);
 

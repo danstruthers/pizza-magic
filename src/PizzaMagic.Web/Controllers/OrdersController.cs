@@ -77,19 +77,23 @@ public sealed class OrdersController(IOrderManagerClient orderManager, RecentOrd
             Tip = order.Pricing.Tip.Mode == "None" ? null : new TipRequest(order.Pricing.Tip.Mode, order.Pricing.Tip.Input),
             EditingOrderId = id,
             EditingVersion = order.Version,
+            EditingRestaurantId = order.RestaurantId,   // priced where the service will price the update
+            EditingChannel = order.Channel,
         });
         return Redirect("/");
     }
 
     [HttpPost("/Orders/{id:guid}/Cancel")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Cancel(Guid id)
+    public async Task<IActionResult> Cancel(Guid id, [FromForm] int? version)
     {
-        var result = await orderManager.CancelAsync(id, null, HttpContext.RequestAborted);
+        // The version the page showed: an order changed since (another tab) is not cancelled blind.
+        var result = await orderManager.CancelAsync(id, version, HttpContext.RequestAborted);
         TempData[CheckoutController.NoticeKey] = result.Kind switch
         {
             ApiResultKind.Success => Cancelled,
             ApiResultKind.Problem when result.Problem!.Type == ProblemTypes.OrderNotFound => NotFoundText,
+            ApiResultKind.Problem when result.Problem!.Type == ProblemTypes.VersionMismatch => CheckoutController.ChangedElsewhere,
             ApiResultKind.Problem when result.Problem!.Status == StatusCodes.Status409Conflict => CheckoutController.KitchenStarted,
             ApiResultKind.Problem => result.Problem!.Detail ?? CancelUnconfirmed,
             _ => CancelUnconfirmed,
@@ -118,7 +122,14 @@ public sealed class OrdersController(IOrderManagerClient orderManager, RecentOrd
     /// </summary>
     private async Task<IReadOnlyList<RecentOrderRow>> RecentAsync()
     {
-        var reads = recentOrders.Read(Request).Select(async id =>
+        // The Session's last placed order too: if the response that placed it was lost, so was its cookie.
+        var ids = recentOrders.Read(Request);
+        if (CartStore.Load(HttpContext.Session).LastPlacedOrderId is { } last && !ids.Contains(last))
+        {
+            recentOrders.Add(HttpContext, last);
+            ids = [last, .. ids];
+        }
+        var reads = ids.Select(async id =>
         {
             var result = await orderManager.GetOrderAsync(id, HttpContext.RequestAborted);
             return result.IsSuccess
