@@ -125,10 +125,105 @@ public class OrderRaceTests(ApiFactory factory) : IClassFixture<ApiFactory>
         }
     }
 
+    // Code review: the races below were untested. Each runs 50 times on a real database.
+
+    private async Task<long> UpdatesAsync(string orderId)
+    {
+        await using var connection = new SqliteConnection(factory.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM order_status_history WHERE order_id = '{orderId}' AND event_type = 'Updated'";
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
+    // Two edits made from the same version (two tabs): exactly one is applied; the other is told the order changed.
+    [Fact]
+    public async Task Two_updates_from_the_same_version_exactly_one_wins()
+    {
+        var client = factory.CreateClient();
+        var two = new UpdateOrderRequest([Pizza("SMALL", 2)], null, null, 1065, null);
+        var three = new UpdateOrderRequest([Pizza("SMALL", 3)], null, null, 1598, null);
+        for (var i = 0; i < Iterations; i++)
+        {
+            var order = await CreateAsync(client, SmallPizza);
+            var id = Guid.Parse(order.OrderId);
+            using var firstScope = factory.Services.CreateScope();
+            using var secondScope = factory.Services.CreateScope();
+
+            var (first, second) = await RaceAsync(
+                () => NewService(firstScope).UpdateAsync(id, two, "\"1\"", null),
+                () => NewService(secondScope).UpdateAsync(id, three, "\"1\"", null));
+
+            new[] { first.Outcome, second.Outcome }.Order().ToArray().ShouldBe([OrderOutcome.Ok, OrderOutcome.VersionMismatch], $"iteration {i}");
+            (await StateAsync(order.OrderId)).LineQuantity.ShouldBe(first.Outcome == OrderOutcome.Ok ? 2 : 3);
+            (await UpdatesAsync(order.OrderId)).ShouldBe(1);
+        }
+    }
+
+    // A cancel and an edit at the same moment: either the edit lands first and the cancel then cancels the edited
+    // order, or the cancel lands first and the edit is refused. The cancel always wins in the end; nothing is lost.
+    [Fact]
+    public async Task Cancel_and_update_racing_end_cancelled_and_consistent()
+    {
+        var client = factory.CreateClient();
+        var two = new UpdateOrderRequest([Pizza("SMALL", 2)], null, null, 1065, null);
+        for (var i = 0; i < Iterations; i++)
+        {
+            var order = await CreateAsync(client, SmallPizza);
+            var id = Guid.Parse(order.OrderId);
+            using var cancelScope = factory.Services.CreateScope();
+            using var editScope = factory.Services.CreateScope();
+
+            var (cancel, edit) = await RaceAsync(
+                () => NewService(cancelScope).CancelAsync(id, null),
+                () => NewService(editScope).UpdateAsync(id, two, "\"1\"", null));
+
+            cancel.Outcome.ShouldBe(OrderOutcome.Ok, $"iteration {i}");
+            var state = await StateAsync(order.OrderId);
+            state.Status.ShouldBe("Cancelled");
+            if (edit.Outcome == OrderOutcome.Ok)
+            {
+                state.LineQuantity.ShouldBe(2, $"iteration {i}: the cancelled order is the edited one");
+            }
+            else
+            {
+                edit.Outcome.ShouldBe(OrderOutcome.NotModifiable, $"iteration {i}");
+                state.LineQuantity.ShouldBe(1);
+            }
+        }
+    }
+
+    // A retried edit (same key, same body) arriving many times at once is applied once, and every copy gets the
+    // answer: never a 412 for the copies that lost the race to their own first attempt.
+    [Fact]
+    public async Task Parallel_retries_of_one_update_apply_once()
+    {
+        var client = factory.CreateClient();
+        var two = new UpdateOrderRequest([Pizza("SMALL", 2)], null, null, 1065, null);
+        for (var i = 0; i < 20; i++)
+        {
+            var order = await CreateAsync(client, SmallPizza);
+            var id = Guid.Parse(order.OrderId);
+            var key = Guid.NewGuid().ToString();
+            using var barrier = new Barrier(10);
+            var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => Task.Run(async () =>
+            {
+                using var scope = factory.Services.CreateScope();
+                barrier.SignalAndWait();
+                return await NewService(scope).UpdateAsync(id, two, "\"1\"", key);
+            })));
+
+            var outcomes = results.Select(r => r.Outcome).ToList();
+            outcomes.Count(o => o == OrderOutcome.Ok).ShouldBe(1, $"iteration {i}: {string.Join(", ", outcomes)}");
+            outcomes.Count(o => o == OrderOutcome.Replayed).ShouldBe(9, $"iteration {i}: {string.Join(", ", outcomes)}");
+            (await UpdatesAsync(order.OrderId)).ShouldBe(1);
+        }
+    }
+
     /// <summary>
     /// The naive variant (test project only): read the status, check it, then write unconditionally. With both racers
-    /// held after their read, both "succeed", which is the bug the conditional UPDATE prevents. This proves the race
-    /// tests above are able to detect it.
+    /// held after their read, both "succeed": the bug the conditional UPDATE prevents. (That the race tests above
+    /// catch it was checked by removing the status condition from the real cancel; see docs/ai-log.md, M11.)
     /// </summary>
     [Fact]
     public async Task Naive_check_then_act_double_succeeds()

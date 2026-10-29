@@ -246,6 +246,24 @@ public class FlowTests
         WebHost.Text(await browser.GetStringAsync("/")).ShouldNotContain("We couldn't confirm your order");
     }
 
+    // A double tap on Place (the same ticket posted twice at once, from one session): one order, and both taps land on it.
+    [Fact]
+    public async Task Double_tap_on_place_creates_one_order()
+    {
+        await using var orderManager = new OrderManagerHost();
+        await using var web = new WebHost(orderManager);
+        var (browser, token) = await OpenBuilderAsync(web);
+        (await WebHost.PostQuoteAsync(browser, token, P9(1))).StatusCode.ShouldBe(HttpStatusCode.OK);
+        var review = await ReviewAsync(browser);
+
+        var taps = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ =>
+            WebHost.PostFormAsync(browser, "/Checkout/Place", review.Token, ("ticket", review.Ticket))));
+
+        taps.ShouldAllBe(t => t.StatusCode == HttpStatusCode.Redirect);
+        taps.Select(t => t.Headers.Location!.OriginalString).Distinct().ShouldHaveSingleItem();
+        (await orderManager.OrderCountAsync()).ShouldBe(1);
+    }
+
     // The order service is down: no order, a clear message, and the builder keeps working once it is back.
     [Fact]
     public async Task Service_down_shows_messages_and_recovers()
