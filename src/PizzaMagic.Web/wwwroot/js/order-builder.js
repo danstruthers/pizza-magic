@@ -160,7 +160,7 @@ if (root) {
         const item = document.createElement('li');
         item.className = 'd-flex flex-wrap align-items-center gap-2 py-1';
         const badge = document.createElement('span');
-        badge.className = `badge ${chip.state === 'applied' ? 'text-bg-success' : 'text-bg-warning'}`;
+        badge.className = `badge ${chip.state === 'applied' ? 'bg-success' : 'bg-warning text-dark'}`;
         badge.textContent = chip.state === 'applied' ? `${chip.code} ✓` : `${chip.code} – not applied`;
         const message = document.createElement('span');
         message.className = 'small';

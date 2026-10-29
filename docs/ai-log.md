@@ -215,3 +215,13 @@ A running log kept from M0. Each entry records the tool, what it was used for, a
 - Live, on spare ports: `--database fantasy` logged `Database profile Fantasy: …\src\PizzaMagic.OrderManager\pizzamagic-fantasy.db`. Sunspire's menu showed Small $4.50, Giant's feast $22.22, MYTHIC at 113/175/300/556 and no Kraken. A live quote of Medium + Griffin sausage with MOONRISE came to 777 − 117 + 495 = 1155. The order builder with `OrderManager:RestaurantId=1003` rendered Sunspire's menu. Without the option, the service logged `pizzamagic.db` in the same folder, served Pizza Magic and returned 404 for restaurant 1003. `--database dragons` stopped startup with "Unknown database 'dragons'. Use --database default … or --database fantasy …". The scratch databases were deleted, and only the processes the agent started were stopped.
 
 **Not built (extended part of section 7.5):** multi-level jurisdictions with COMBINED/PER_LEVEL scope, a tax-class (POTION) rate, and themed crusts and sauces with fixed or size-scaled upcharges. The built validator refuses each of them (A70), and `Extended_part_is_still_refused` pins that on the fantasy database. They arrive with M4 EXT and X2 + UQ20.
+
+## 2026-10-28: invisible status and promo badges
+
+**Found by the user, missed by every test:** "Your orders" showed no status, and the kitchen page seemed to show cancelled orders. The cause was AI-written markup using Bootstrap 5.2's `text-bg-*` badge classes while the app ships Bootstrap 5.1, which doesn't define them: every status and promo badge rendered as white text on no background. The text was in the HTML, so all the text-based tests (and the agent's earlier text-only browser checks) passed. The kitchen page was correct: the user's database showed both cancelled orders excluded; its badges were simply unreadable.
+
+**Diagnosed rather than guessed:** read the user's order statuses from the database (read-only), rendered the kitchen page from the running app, then took real screenshots in headless Edge of the current build on spare ports with a scratch database, which showed the blank badges.
+
+**Fixed and guarded:** the classes are now Bootstrap 5.1's `bg-*` (with `text-dark` on amber and blue). `StylesheetTests.Every_colour_class_used_exists_in_the_shipped_bootstrap` scans the web app's views, C# and scripts for colour classes and requires each to exist in the shipped `bootstrap.min.css`; it failed on all 9 uses before the fix. Screenshots after the fix show the badges on "Your orders", the kitchen page and the builder's promo list.
+
+**Lesson:** for UI changes, look at the page (screenshots), not only at its text.

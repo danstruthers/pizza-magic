@@ -79,14 +79,17 @@ public static class Display
         _ => status,
     };
 
-    /// <summary>A status badge colour for the order lists: grey, amber, blue, green, or dark when cancelled.</summary>
+    /// <summary>
+    /// A status badge colour for the order lists: grey, amber, blue, green, or dark when cancelled. Bootstrap 5.1 classes
+    /// (the shipped version has no 5.2 <c>text-bg-*</c>); badges are white text, so the light colours add <c>text-dark</c>.
+    /// </summary>
     public static string StatusBadge(string status) => status switch
     {
-        "Started" => "text-bg-warning",
-        "ReadyForPickup" => "text-bg-info",
-        "Delivered" => "text-bg-success",
-        "Cancelled" => "text-bg-dark",
-        _ => "text-bg-secondary",
+        "Started" => "bg-warning text-dark",
+        "ReadyForPickup" => "bg-info text-dark",
+        "Delivered" => "bg-success",
+        "Cancelled" => "bg-dark",
+        _ => "bg-secondary",
     };
 
     /// <summary>"12:05 PM PDT" in the restaurant's zone, or the UTC time when the service had no local time.</summary>

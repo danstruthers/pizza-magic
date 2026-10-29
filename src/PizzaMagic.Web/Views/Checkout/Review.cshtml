@@ -59,7 +59,7 @@
                     @foreach (var promo in quote.Promotions)
                     {
                         <li>
-                            <span class="badge @(promo.Status == "Applied" ? "text-bg-success" : "text-bg-warning")">@promo.Code</span>
+                            <span class="badge @(promo.Status == "Applied" ? "bg-success" : "bg-warning text-dark")">@promo.Code</span>
                             @promo.Message
                         </li>
                     }
