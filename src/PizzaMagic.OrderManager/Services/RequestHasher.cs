@@ -43,18 +43,19 @@ public static class RequestHasher
         UpdateOperation, orderId.ToString(), ifMatch.Trim(), null, null, Lines(request.LineItems), Codes(request.PromoCodes),
         Code(request.Tip?.Mode), request.Tip?.Value, request.ExpectedTotalCents, request.CustomerName?.Trim()));
 
-    private static List<CanonicalLine> Lines(IReadOnlyList<LineItemRequest>? lines) =>
+    // Null entries hash like empty ones: the request is refused (422) either way, and refusals are never stored.
+    private static List<CanonicalLine> Lines(IReadOnlyList<LineItemRequest?>? lines) =>
         (lines ?? []).Select(l => new CanonicalLine(
-            Code(l.Kind) ?? "",
-            Code(l.SizeCode) ?? "",
-            l.Quantity,
-            Code(l.CrustCode),
-            Code(l.SauceCode),
-            Code(l.ProductCode),
-            (l.Toppings ?? []).Select(t => new CanonicalTopping(
-                Code(t.Code) ?? "",
-                Code(t.Portion) ?? DraftValidator.WholePortionCode,
-                t.Multiplier ?? 1)).ToList())).ToList();
+            Code(l?.Kind) ?? "",
+            Code(l?.SizeCode) ?? "",
+            l?.Quantity ?? 0,
+            Code(l?.CrustCode),
+            Code(l?.SauceCode),
+            Code(l?.ProductCode),
+            (l?.Toppings ?? []).Select(t => new CanonicalTopping(
+                Code(t?.Code) ?? "",
+                Code(t?.Portion) ?? DraftValidator.WholePortionCode,
+                t?.Multiplier ?? 1)).ToList())).ToList();
 
     private static List<string> Codes(IReadOnlyList<string>? codes) => (codes ?? []).Select(c => Code(c) ?? "").ToList();
 

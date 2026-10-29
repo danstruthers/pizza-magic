@@ -10,11 +10,10 @@ public partial class RoundingScanTests
 {
     private static readonly string[] EngineFolders = ["Catalog", "Pricing", "Promotions", "Tax"];
 
-    /// <summary>Where Truncate may appear: its two definitions and the one caller (the TRUNCATE tax method).</summary>
+    /// <summary>Where Truncate may appear: its definition and the one caller (the TRUNCATE tax method).</summary>
     private static readonly string[] TruncateAllowed =
     [
         "src/PizzaMagic.Domain/Monetary/Rounding.cs",
-        "src/PizzaMagic.Domain/Monetary/Money.cs",
         "src/PizzaMagic.Domain/Tax/TaxCalculator.cs",
     ];
 

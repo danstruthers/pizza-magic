@@ -38,19 +38,21 @@ public class MalformedRequestTests(ApiFactory factory) : IClassFixture<ApiFactor
     [Fact]
     public async Task Null_line_is_a_field_error_not_a_500()
     {
-        const string body = """{"lineItems":[null],"promoCodes":[],"tip":null,"expectedTotalCents":0}""";
+        const string quote = """{"lineItems":[null],"promoCodes":[],"tip":null}""";
+        const string submit = """{"lineItems":[null],"promoCodes":[],"tip":null,"expectedTotalCents":0}""";
 
-        await ShouldBe422(await QuoteAsync(body), ("lineItems[0]", "INVALID_LINE"));
-        await ShouldBe422(await SubmitJsonAsync(body), ("lineItems[0]", "INVALID_LINE"));
+        await ShouldBe422(await QuoteAsync(quote), ("lineItems[0]", "INVALID_LINE"));
+        await ShouldBe422(await SubmitJsonAsync(submit), ("lineItems[0]", "INVALID_LINE"));
     }
 
     [Fact]
     public async Task Null_topping_is_a_field_error_not_a_500()
     {
-        const string body = """{"lineItems":[{"kind":"Pizza","sizeCode":"SMALL","quantity":1,"toppings":[{"code":"PEPPERONI"},null]}],"expectedTotalCents":0}""";
+        const string quote = """{"lineItems":[{"kind":"Pizza","sizeCode":"SMALL","quantity":1,"toppings":[{"code":"PEPPERONI"},null]}]}""";
+        const string submit = """{"lineItems":[{"kind":"Pizza","sizeCode":"SMALL","quantity":1,"toppings":[{"code":"PEPPERONI"},null]}],"expectedTotalCents":0}""";
 
-        await ShouldBe422(await QuoteAsync(body), ("lineItems[0].toppings[1]", "INVALID_TOPPING"));
-        await ShouldBe422(await SubmitJsonAsync(body), ("lineItems[0].toppings[1]", "INVALID_TOPPING"));
+        await ShouldBe422(await QuoteAsync(quote), ("lineItems[0].toppings[1]", "INVALID_TOPPING"));
+        await ShouldBe422(await SubmitJsonAsync(submit), ("lineItems[0].toppings[1]", "INVALID_TOPPING"));
     }
 
     [Fact]

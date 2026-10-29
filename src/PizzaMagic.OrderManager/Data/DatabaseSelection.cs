@@ -27,6 +27,22 @@ public sealed record DatabaseSelection(SeedProfile Profile, string ConnectionStr
     /// <summary><c>--database fantasy</c> is <c>Seed:Profile=fantasy</c>.</summary>
     public static IDictionary<string, string> SwitchMappings => new Dictionary<string, string> { ["--database"] = ProfileKey };
 
+    /// <summary>
+    /// The configuration provider silently drops a switch with no value (<c>--database</c> alone, or followed by another
+    /// option), which would start the default database; refuse that instead.
+    /// </summary>
+    public static void CheckArguments(IReadOnlyList<string> args)
+    {
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i].Equals("--database", StringComparison.OrdinalIgnoreCase)
+                && (i + 1 == args.Count || args[i + 1].StartsWith('-')))
+            {
+                throw new DatabaseProfileException("--database needs a value: default or fantasy.");
+            }
+        }
+    }
+
     /// <summary>No value means the default database; anything other than default/fantasy (any case) is refused.</summary>
     public static SeedProfile ParseProfile(string? value) => value?.ToUpperInvariant() switch
     {

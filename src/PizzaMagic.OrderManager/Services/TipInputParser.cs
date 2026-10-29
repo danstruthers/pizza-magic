@@ -16,16 +16,28 @@ public static partial class TipInputParser
     private const decimal PpmPerPercent = 10_000m;
     private const string InvalidMessage = "Tip must be zero or more, with at most two decimal places.";
 
+    /// <summary>
+    /// Far above any tip limit, and small enough to scale safely (decimal overflows near 7.9e28): a longer whole part
+    /// is out of range without being multiplied.
+    /// </summary>
+    private const int MaxWholeDigits = 15;
+
     public static TipInput Parse(TipRequest? tip, out FieldError? error)
     {
         error = null;
-        if (tip is null || tip.Mode is null || tip.Mode.Equals("None", StringComparison.OrdinalIgnoreCase))
+        var text = tip?.Value?.Trim();
+        if (tip?.Mode is not { } modeText || modeText.Equals("None", StringComparison.OrdinalIgnoreCase))
         {
+            if (string.IsNullOrEmpty(text))
+            {
+                return TipInput.None;
+            }
+            error = new FieldError("tip.mode", "TIP_INVALID", "Choose Amount or Percent for the tip, or leave the tip empty.");
             return TipInput.None;
         }
 
-        var mode = tip.Mode.Equals("Amount", StringComparison.OrdinalIgnoreCase) ? TipMode.Amount
-            : tip.Mode.Equals("Percent", StringComparison.OrdinalIgnoreCase) ? TipMode.Percent
+        var mode = modeText.Equals("Amount", StringComparison.OrdinalIgnoreCase) ? TipMode.Amount
+            : modeText.Equals("Percent", StringComparison.OrdinalIgnoreCase) ? TipMode.Percent
             : (TipMode?)null;
         if (mode is null)
         {
@@ -33,20 +45,24 @@ public static partial class TipInputParser
             return TipInput.None;
         }
 
-        if (tip.Value is null || !PlainDecimal().IsMatch(tip.Value)
-            || !decimal.TryParse(tip.Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
+        if (string.IsNullOrEmpty(text))
+        {
+            error = new FieldError("tip.value", "TIP_INVALID", "Enter a tip, or choose No tip.");
+            return TipInput.None;
+        }
+        if (!PlainDecimal().IsMatch(text))
         {
             error = new FieldError("tip.value", "TIP_INVALID", InvalidMessage);
             return TipInput.None;
         }
-
-        var scaled = value * (mode == TipMode.Amount ? CentsPerDollar : PpmPerPercent);
-        if (scaled > long.MaxValue)
+        if (text.Split('.')[0].TrimStart('0').Length > MaxWholeDigits)
         {
-            error = new FieldError("tip.value", "TIP_OUT_OF_RANGE", "The tip is outside the allowed range.");
+            error = new FieldError("tip.value", "TIP_OUT_OF_RANGE", "The tip is too large.");
             return TipInput.None;
         }
-        return new TipInput(mode.Value, (long)scaled);
+
+        var value = decimal.Parse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
+        return new TipInput(mode.Value, (long)(value * (mode == TipMode.Amount ? CentsPerDollar : PpmPerPercent)));
     }
 
     /// <summary>Digits, optionally a point and one or two digits. No sign, exponent, spaces or thousands separators.</summary>

@@ -100,7 +100,7 @@ public static class OrderSnapshot
                         CoveragePhrase = ToppingPhrase.Of(c.Product.DisplayName, c.Multiplier),
                         PortionTypeCode = DraftValidator.WholePortionCode,
                         Multiplier = c.Multiplier,
-                        PriceSource = "GlobalTier",
+                        PriceSource = SourceLabels.Topping(c.ToppingPrice!),
                         PricingMethod = c.ToppingPrice!.PricingMethod,
                         RatePpm = c.ToppingPrice.Rate?.Ppm,
                         ToppingUnitPriceCents = c.ToppingPrice.UnitPrice.Cents,
@@ -165,7 +165,7 @@ public static class OrderSnapshot
                 DiscountCents = taxLine.Discount.Cents,
                 TaxableBaseCents = taxLine.Taxable.Cents,
                 RatePpm = taxLine.Rate.Ppm,
-                RateSource = "Default",
+                RateSource = SourceLabels.DefaultRate,
                 TaxCents = taxLine.Amount.Cents,
             });
         }

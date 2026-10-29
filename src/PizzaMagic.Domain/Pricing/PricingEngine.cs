@@ -58,8 +58,9 @@ public sealed class PricingEngine(PromotionEngine promotions)
         var issues = lines.Count == 0 ? new List<PricingIssue> { new("ORDER_EMPTY", "Add at least one pizza to your order.") } : [];
         var normalized = new OrderDraft(lines.Select(l => Normalize(l.Line)).ToList(), promotionResult.NormalizedPromoCodes, draft.Tip);
         var canSubmit = lines.Count > 0
-            && promotionResult.Outcomes.Where(o => o.Code is not null && promotionResult.NormalizedPromoCodes.Contains(o.Code))
-                .All(o => o.Status == PromoStatus.Applied);
+            && promotionResult.Outcomes
+                .Where(o => o.Status != PromoStatus.Duplicate && o.Code is not null && promotionResult.NormalizedPromoCodes.Contains(o.Code))
+                .All(o => o.Status == PromoStatus.Applied);   // a repeat collapses into the held code and blocks nothing
 
         var breakdown = new PriceBreakdown(
             lines, subtotal, promotionResult, discount, allocations, taxable, tax, bill, tip,

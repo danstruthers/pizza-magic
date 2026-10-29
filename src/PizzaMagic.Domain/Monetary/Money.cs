@@ -18,8 +18,4 @@ public readonly record struct Money(long Cents)
     /// <summary>The rate applied to this amount, rounded half away from zero to whole cents.</summary>
     public Money ApplyRate(Rate rate) =>
         new(Rounding.RoundHalfAwayFromZero(checked(Cents * rate.Ppm), PpmScale));
-
-    /// <summary>The rate applied to this amount, truncated to whole cents. Tax TRUNCATE only.</summary>
-    public Money ApplyRateTruncated(Rate rate) =>
-        new(Rounding.Truncate(checked(Cents * rate.Ppm), PpmScale));
 }

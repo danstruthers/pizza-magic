@@ -12,6 +12,9 @@ public static class DraftValidator
     /// <summary>The only portion the built scope accepts (A69).</summary>
     public const string WholePortionCode = "WHOLE";
 
+    private const long CentsPerDollar = 100;
+    private const long PpmPerPercent = 10_000;
+
     public static IReadOnlyList<FieldError> Validate(OrderDraft draft, PricingCatalog catalog)
     {
         var policy = catalog.Policy;
@@ -21,6 +24,7 @@ public static class DraftValidator
         if (draft.LineItems.Count > policy.MaxLines)
         {
             errors.Add(new FieldError("lineItems", "TOO_MANY_LINES", $"An order can have at most {Plural(policy.MaxLines, "line")}."));
+            return errors;   // one error, not one per line: a response must never be many times its request
         }
 
         for (var i = 0; i < draft.LineItems.Count; i++)
@@ -41,6 +45,7 @@ public static class DraftValidator
             {
                 errors.Add(new FieldError($"{path}.toppings", "TOO_MANY_TOPPINGS",
                     $"A pizza can have at most {Plural(policy.MaxToppingsPerPizza, "topping")}."));
+                continue;   // likewise, no per-topping errors past the limit
             }
 
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -81,11 +86,17 @@ public static class DraftValidator
         };
         if (tipLimit is { } limit && (draft.Tip.Value < 0 || draft.Tip.Value > limit))
         {
-            errors.Add(new FieldError("tip.value", "TIP_OUT_OF_RANGE", "The tip is outside the allowed range."));
+            errors.Add(new FieldError("tip.value", "TIP_OUT_OF_RANGE", draft.Tip.Mode == TipMode.Amount
+                ? $"A dollar tip can be at most ${limit / CentsPerDollar}.{limit % CentsPerDollar:00}."
+                : $"A percentage tip can be at most {Percent(limit)}%."));
         }
 
         return errors;
     }
+
+    /// <summary>"100", or "17.5" for a fractional percentage (limit in parts per million).</summary>
+    private static string Percent(long ppm) =>
+        ppm % PpmPerPercent == 0 ? $"{ppm / PpmPerPercent}" : $"{ppm / PpmPerPercent}.{ppm % PpmPerPercent:0000}".TrimEnd('0');
 
     /// <summary>Codes are trimmed and case-insensitive; catalog codes are upper case.</summary>
     public static string Canonical(string? code) => (code ?? "").Trim().ToUpperInvariant();

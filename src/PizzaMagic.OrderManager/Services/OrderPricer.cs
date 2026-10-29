@@ -23,6 +23,12 @@ public sealed class OrderPricer(PizzaMagicDbContext db, CatalogLoader loader, Pr
     private const string PizzaKind = "Pizza";
     private const string AddOnKind = "AddOn";
 
+    // Raw request sizes, far above any ordering policy, checked before anything is looked up or priced, so a response
+    // is never many times larger than its request (policy limits, e.g. 20 lines, are the Domain validator's).
+    private const int MaxLineEntries = 100;
+    private const int MaxToppingEntries = 100;
+    private const int MaxPromoCodeEntries = 10;
+
     public async Task<PricingOutcome> PriceAsync(QuoteRequest request, CancellationToken cancellationToken = default)
     {
         var errors = new List<FieldError>();
@@ -41,14 +47,11 @@ public sealed class OrderPricer(PizzaMagicDbContext db, CatalogLoader loader, Pr
         }
 
         var lines = request.LineItems ?? [];
-        var kindErrors = lines
-            .Select((line, i) => KindError(line.Kind, i))
-            .OfType<FieldError>()
-            .ToList();
-        errors.AddRange(kindErrors);
+        var shapeErrors = ShapeErrors(lines, request.PromoCodes);
+        errors.AddRange(shapeErrors);
 
         var tip = TipInputParser.Parse(request.Tip, out var tipError);
-        if (!restaurantValid || kindErrors.Count > 0)
+        if (!restaurantValid || shapeErrors.Count > 0)
         {
             return Failed(errors, tipError, channel);
         }
@@ -58,7 +61,7 @@ public sealed class OrderPricer(PizzaMagicDbContext db, CatalogLoader loader, Pr
             lines.Select(l => new PizzaDraftLine(
                 l.SizeCode ?? "",
                 l.Quantity,
-                (l.Toppings ?? []).Select(t => new DraftTopping(t.Code ?? "", t.Portion, t.Multiplier)).ToList(),
+                (l.Toppings ?? []).Select(t => new DraftTopping(t?.Code ?? "", t?.Portion, t?.Multiplier)).ToList(),
                 l.CrustCode,
                 l.SauceCode)).ToList(),
             request.PromoCodes ?? [],
@@ -80,6 +83,51 @@ public sealed class OrderPricer(PizzaMagicDbContext db, CatalogLoader loader, Pr
             errors.Add(tipError);
         }
         return new PricingOutcome(errors, null, null, channel, null);
+    }
+
+    /// <summary>
+    /// Structural problems the Domain can't see: list sizes, null entries, unsupported line kinds and fields that only
+    /// unbuilt line kinds use. Reported with their paths, before pricing.
+    /// </summary>
+    private static List<FieldError> ShapeErrors(IReadOnlyList<LineItemRequest?> lines, IReadOnlyList<string?>? promoCodes)
+    {
+        var errors = new List<FieldError>();
+        if (lines.Count > MaxLineEntries)
+        {
+            errors.Add(new FieldError("lineItems", "TOO_MANY_LINES", $"An order can have at most {MaxLineEntries} lines."));
+            return errors;
+        }
+        if (promoCodes?.Count > MaxPromoCodeEntries)
+        {
+            errors.Add(new FieldError("promoCodes", "TOO_MANY_PROMO_CODES", $"Enter at most {MaxPromoCodeEntries} promo codes."));
+        }
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (lines[i] is not { } line)
+            {
+                errors.Add(new FieldError($"lineItems[{i}]", "INVALID_LINE", "Each line must be an object."));
+                continue;
+            }
+            if (KindError(line.Kind, i) is { } kindError)
+            {
+                errors.Add(kindError);
+                continue;
+            }
+            if (line.ProductCode is not null)
+            {
+                errors.Add(new FieldError($"lineItems[{i}].productCode", "FIELD_NOT_ALLOWED",
+                    "productCode is for add-on lines, which are designed but not built in this version."));
+            }
+            var toppings = line.Toppings ?? [];
+            for (var j = 0; j < Math.Min(toppings.Count, MaxToppingEntries); j++)
+            {
+                if (toppings[j] is null)
+                {
+                    errors.Add(new FieldError($"lineItems[{i}].toppings[{j}]", "INVALID_TOPPING", "Each topping must be an object."));
+                }
+            }
+        }
+        return errors;
     }
 
     private static FieldError? KindError(string? kind, int index)

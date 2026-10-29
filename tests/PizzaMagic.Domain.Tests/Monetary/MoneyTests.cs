@@ -23,15 +23,6 @@ public class MoneyTests
         new Money(cents).ApplyRate(new Rate(ppm)).ShouldBe(new Money(expected));
     }
 
-    // M11, M12: the truncating variant (tax TRUNCATE only).
-    [Theory]
-    [InlineData(500, 65_000, 32)]
-    [InlineData(738, 65_000, 47)]
-    [InlineData(1200, 65_000, 78)]
-    public void ApplyRateTruncated_drops_fractional_cents(long cents, int ppm, long expected)
-    {
-        new Money(cents).ApplyRateTruncated(new Rate(ppm)).ShouldBe(new Money(expected));
-    }
 
     [Fact]
     public void ApplyRate_on_negative_amount_throws()

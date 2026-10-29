@@ -315,7 +315,9 @@ public sealed partial class OrderService(
         }
         var detail = current.Status == nameof(OrderStatus.Cancelled)
             ? $"Order was cancelled at {UtcTimestampConverter.Write(current.StatusChangedAtUtc)}."
-            : $"Order is {OrderStateMachine.DisplayName(Enum.Parse<OrderStatus>(current.Status))}, not {OrderStateMachine.DisplayName(expected.Value)}.";
+            : current.Status == expected.Value.ToString()   // a final status: there is no next step
+                ? $"Order is already {OrderStateMachine.DisplayName(expected.Value)}."
+                : $"Order is {OrderStateMachine.DisplayName(Enum.Parse<OrderStatus>(current.Status))}, not {OrderStateMachine.DisplayName(expected.Value)}.";
         return new OrderResult(OrderOutcome.InvalidTransition, Current: current, Zone: await ZoneAsync(current, cancellationToken), Detail: detail);
     }
 
@@ -348,27 +350,26 @@ public sealed partial class OrderService(
         }
 
         var active = Enum.GetValues<OrderStatus>().Where(s => !OrderStateMachine.IsTerminal(s)).Select(s => s.ToString()).ToList();
+        // Oldest first, sorted by the database (UTC timestamps are fixed-width text, so text order is time order). Only
+        // what the queue shows is loaded: the lines, toppings and promotions its item descriptions are built from.
         var orders = await db.Orders.AsNoTrackingWithIdentityResolution()
             .Where(o => o.RestaurantId == restaurant.Id && active.Contains(o.Status))
+            .OrderBy(o => o.CreatedAtUtc).ThenBy(o => o.Id)
             .Include(o => o.Lines).ThenInclude(l => l.Toppings)
             .Include(o => o.Promotions)
-            .Include(o => o.TaxLines)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         var zone = await loader.LoadZoneAsync(restaurant.TimeZoneId, cancellationToken);
-        var queue = orders
-            .OrderBy(o => o.CreatedAtUtc).ThenBy(o => o.Id, StringComparer.Ordinal)
-            .Select(order =>
-            {
-                var view = OrderView.ToResponse(order, zone);
-                var next = OrderStateMachine.NextKitchenStatus(Enum.Parse<OrderStatus>(order.Status))!.Value;
-                return new KitchenOrderResponse(
-                    view.OrderId, view.Status, view.StatusDisplay, view.Version, view.CreatedAt, view.CreatedAtLocal, view.CustomerName,
-                    view.Pricing.LineItems.Select(l => l.Description).ToList(), view.Pricing.TotalCents,
-                    next.ToString(), OrderStateMachine.DisplayName(next));
-            })
-            .ToList();
+        var queue = orders.Select(order =>
+        {
+            var status = Enum.Parse<OrderStatus>(order.Status);
+            var next = OrderStateMachine.NextKitchenStatus(status)!.Value;
+            return new KitchenOrderResponse(
+                order.Id, order.Status, OrderStateMachine.DisplayName(status), order.Version,
+                UtcTimestampConverter.Write(order.CreatedAtUtc), OrderView.Local(zone, order.CreatedAtUtc), order.CustomerName,
+                OrderView.ItemDescriptions(order), order.TotalCents, next.ToString(), OrderStateMachine.DisplayName(next));
+        }).ToList();
         return new KitchenQueueResponse(restaurant.Id, queue);
     }
 

@@ -12,7 +12,6 @@ public static class ResponseMapper
 {
     /// <summary>Built scope (A69): every topping is a whole 1x placement at the WHOLE factor.</summary>
     private const string WholeLabel = "whole";
-    private const string GlobalTierSource = "GlobalTier";
 
     public static QuoteResponse ToQuote(PricingOutcome outcome)
     {
@@ -37,7 +36,7 @@ public static class ResponseMapper
                 DraftValidator.WholePortionCode,
                 WholeLabel,
                 c.Multiplier,
-                GlobalTierSource,
+                SourceLabels.Topping(c.ToppingPrice!),
                 c.ToppingPrice!.UnitPrice.Cents,
                 Domain.Monetary.Rate.MaxPpm,
                 c.ToppingPrice.UnitPrice.Cents,   // whole coverage: the placement unit charge is the topping unit price
@@ -67,7 +66,7 @@ public static class ResponseMapper
         var tax = breakdown.Tax;
         var taxLines = tax.Lines.Select(t => new TaxLineResponse(
             t.JurisdictionCode, t.Depth, catalog.TaxClassCodes[t.TaxClassId], t.Gross.Cents, t.Discount.Cents,
-            t.Taxable.Cents, t.Rate.Ppm, "Default", t.Amount.Cents)).ToList();
+            t.Taxable.Cents, t.Rate.Ppm, SourceLabels.DefaultRate, t.Amount.Cents)).ToList();
 
         var tipInput = breakdown.NormalizedDraft.Tip;
         var tip = new TipResponse(

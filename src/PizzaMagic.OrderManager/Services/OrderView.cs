@@ -112,6 +112,10 @@ public static class OrderView
             ? new LocalTimeResponse(LocalWallClockConverter.Write(local.LocalTime), local.UtcOffsetMinutes, local.Abbreviation)
             : null;
 
+    /// <summary>One description per line, as the order describes itself (the kitchen queue needs only these).</summary>
+    public static IReadOnlyList<string> ItemDescriptions(CustomerOrderEntity order) =>
+        OrderDescriber.Describe(ToDescriptionSource(order)).Items.Select(i => i.Text).ToList();
+
     private static DescriptionSource ToDescriptionSource(CustomerOrderEntity order) => new(
         order.Lines.OrderBy(l => l.LineNumber).Select(l => new DescribedPizzaLine(
             l.Quantity, l.ProductName, l.CrustName!, l.CrustIsDefault!.Value, l.SauceName!, l.SauceIsDefault!.Value,
