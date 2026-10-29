@@ -79,7 +79,7 @@ public class PricingEngineTests
         breakdown.Total.ShouldBe(new Money(8871));
     }
 
-    // PR totals (PR1, PR3-PR8) on top of M3's discounts.
+    // PR1, PR3-PR6: order totals for the promotion engine's discount vectors.
     public static TheoryData<string, OrderDraft, long, long> PromotionTotals => new()
     {
         { "PR1", Draft([Pizza("LARGE", 1, "PEPPERONI", "SAUSAGE", "BACON")], null, "ILOVEPIZZA"), 152, 1461 },
@@ -204,7 +204,8 @@ public class PricingEngineTests
         again.NormalizedDraft.ShouldBeEquivalentTo(first.NormalizedDraft);
     }
 
-    // N7: omitted crust and sauce become explicit defaults; toppings are in canonical order and explicit WHOLE x1.
+    // N7: omitted crust and sauce become explicit defaults; toppings are upper-cased, put in canonical order, and name
+    // their portion and multiplier.
     [Fact]
     public void NormalizedDraft_names_default_crust_and_sauce()
     {
@@ -300,7 +301,7 @@ public class PricingEngineTests
             .Promotions.Outcomes[1].Status.ShouldBe(PromoStatus.LimitExceeded);
     }
 
-    // A code entered twice collapses; the duplicate must not block submitting (canSubmit used to be false).
+    // A code entered twice collapses into one, and the duplicate doesn't block submitting.
     [Fact]
     public void Repeated_code_does_not_block_submit()
     {

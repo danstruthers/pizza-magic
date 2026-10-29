@@ -11,7 +11,7 @@ namespace PizzaMagic.FantasySeedGen;
 /// <para>
 /// Only data the built code reads is generated. The extended part of section 7.5 (multi-level tax, per-class rates,
 /// rounding scope, themed crusts and sauces with upcharges) is designed, not built: CatalogValidator refuses that data
-/// (A70), and each piece is added here when its milestone (M4 EXT, X2 + UQ20) removes the matching validator line.
+/// (A70). Add each piece here once its code is built and the matching validator check is removed.
 /// </para>
 /// </summary>
 public static class FantasyRealmGenerator

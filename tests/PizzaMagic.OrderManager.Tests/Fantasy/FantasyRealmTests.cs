@@ -43,7 +43,7 @@ public sealed class FantasyRealmDatabase : IAsyncLifetime
 }
 
 /// <summary>
-/// M15F core part (plan section 7.5, UQ26): the fantasy realm loads, validates and prices correctly far outside the
+/// Fantasy realm, core part (plan section 7.5, UQ26): the realm loads, validates and prices correctly far outside the
 /// spec's single restaurant. Golden numbers were computed independently by a Node script (BigInt, from the plan's
 /// rules; the arithmetic is in docs/ai-log.md), not by this code.
 /// </summary>
@@ -351,8 +351,8 @@ public class FantasyRealmTests(FantasyRealmDatabase realm) : IClassFixture<Fanta
         Status(catalog, "ARCHMAGE", ends).ShouldBe(PromoStatus.Expired);
     }
 
-    // At one instant (19:00Z) the same window is open where the local date is already Oct 28 and closed elsewhere;
-    // the two restaurants sharing Realm/Sunspire always agree.
+    // At one instant (2026-10-27T19:00Z) each window is open in some zones and closed in others, by local clock:
+    // MOONRISE only where it is already Oct 28, ARCHMAGE only where it is not yet 18:00 on Oct 27.
     [Fact]
     public async Task Same_instant_is_open_in_one_zone_and_closed_in_another()
     {

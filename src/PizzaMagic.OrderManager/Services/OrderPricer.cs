@@ -14,8 +14,8 @@ public sealed record PricingOutcome(
     TipRequest? Tip);
 
 /// <summary>
-/// The single pricing entry point for every endpoint (plan section 2.3): quotes now, submit and update in M10 call
-/// this same method on the same rows, so the price the customer sees is the price charged.
+/// The single pricing entry point (plan section 2.3): quote, submit and update all call this method on the same rows,
+/// so the price the customer sees is the price charged.
 /// </summary>
 public sealed class OrderPricer(PizzaMagicDbContext db, CatalogLoader loader, PricingEngine engine, TimeProvider clock)
 {
@@ -23,8 +23,9 @@ public sealed class OrderPricer(PizzaMagicDbContext db, CatalogLoader loader, Pr
     private const string PizzaKind = "Pizza";
     private const string AddOnKind = "AddOn";
 
-    // Raw request sizes, far above any ordering policy, checked before anything is looked up or priced, so a response
-    // is never many times larger than its request (policy limits, e.g. 20 lines, are the Domain validator's).
+    // Raw request sizes, far above any ordering policy, checked before the catalog loads, so a response is never many
+    // times larger than its request (policy limits, e.g. 20 lines, are the Domain validator's). Toppings past
+    // MaxToppingEntries are not scanned here; the per-pizza policy limit reports them.
     private const int MaxLineEntries = 100;
     private const int MaxToppingEntries = 100;
     private const int MaxPromoCodeEntries = 10;

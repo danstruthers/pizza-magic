@@ -4,7 +4,7 @@ namespace PizzaMagic.Domain.Tests.Monetary;
 
 public class RoundingTests
 {
-    // M1, M3: exact midpoints round away from zero (banker's rounding would give 32 and 38).
+    // M1, M3: exact midpoints round away from zero (banker's rounding would give 32, 38 and 66).
     [Theory]
     [InlineData(32_500_000, 33)]
     [InlineData(38_500_000, 39)]

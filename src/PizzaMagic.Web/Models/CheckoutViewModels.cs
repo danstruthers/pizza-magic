@@ -80,8 +80,8 @@ public static class Display
     };
 
     /// <summary>
-    /// A status badge colour for the order lists: grey, amber, blue, green, or dark when cancelled. Bootstrap 5.1 classes
-    /// (the shipped version has no 5.2 <c>text-bg-*</c>); badges are white text, so the light colours add <c>text-dark</c>.
+    /// A status badge color for the order lists: gray, amber, blue, green, or dark when cancelled. Bootstrap 5.1 classes
+    /// (the shipped version has no 5.2 <c>text-bg-*</c>); badges are white text, so the light colors add <c>text-dark</c>.
     /// </summary>
     public static string StatusBadge(string status) => status switch
     {

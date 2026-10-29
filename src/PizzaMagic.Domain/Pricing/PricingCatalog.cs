@@ -5,7 +5,7 @@ using PizzaMagic.Domain.Time;
 
 namespace PizzaMagic.Domain.Pricing;
 
-/// <summary>Menu-facing limits for one restaurant (ordering_policy row).</summary>
+/// <summary>One restaurant's order limits and tip presets (its ordering_policy row); the menu shows them too.</summary>
 public sealed record OrderingPolicy(
     int MaxLines,
     int MaxLineQuantity,

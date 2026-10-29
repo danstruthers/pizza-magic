@@ -80,7 +80,8 @@ public class LocalTimeResolverTests
     private static DateTimeOffset Utc(string value) =>
         DateTimeOffset.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
 
-    // TZ11: a local boundary maps to the earliest UTC instant at which the local clock reads it (or later).
+    // TZ11: a local boundary maps to the earliest UTC instant at which the local clock reads it; a time in the
+    // spring-forward gap maps to the first instant after the gap.
     [Fact]
     public void Boundary_normal_ambiguous_gap_and_other_zone()
     {

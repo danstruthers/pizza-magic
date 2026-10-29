@@ -1,7 +1,7 @@
 namespace PizzaMagic.OrderManager.Data.Entities;
 
 // Catalog and configuration rows (plan section 4.3). Column names come from the snake_case convention;
-// table names are set explicitly in PizzaMagicDbContext. Order tables are mapped in M10.
+// table names are set explicitly in PizzaMagicDbContext. Order rows are in OrderEntities.cs.
 
 public sealed class TaxClassEntity
 {

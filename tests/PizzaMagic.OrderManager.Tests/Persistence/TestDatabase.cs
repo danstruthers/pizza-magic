@@ -5,8 +5,8 @@ using PizzaMagic.OrderManager.Data;
 namespace PizzaMagic.OrderManager.Tests.Persistence;
 
 /// <summary>
-/// A real SQLite database in a temp file, initialized by the same startup path as the service (migrate, WAL,
-/// seed scripts, catalog validation). Never the EF InMemory provider (plan section 4.6).
+/// A real SQLite database in a temp file, set up by the service's own migrate-and-seed step (migrations, WAL, seed
+/// scripts); catalog validation is left to the tests that want it. Never the EF InMemory provider (plan section 4.6).
 /// </summary>
 public sealed class TestDatabase : IAsyncDisposable
 {

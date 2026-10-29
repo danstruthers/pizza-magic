@@ -15,7 +15,7 @@ namespace PizzaMagic.OrderManager.Services;
 /// </summary>
 public static class OrderSnapshot
 {
-    /// <summary>Built scope (A69): every topping is a whole 1x placement.</summary>
+    /// <summary>Built scope (A69): every topping covers the whole pizza, at a multiplier of 1 or more (UQ29).</summary>
     private const string WholeLabel = "whole";
     private const int WholeMask = 15;
 

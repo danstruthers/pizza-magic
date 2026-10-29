@@ -7,7 +7,7 @@ using static PizzaMagic.Domain.Tests.Pricing.TestCatalogs;
 namespace PizzaMagic.Domain.Tests.Pricing;
 
 /// <summary>
-/// Extra toppings on the whole pizza (UQ29): a topping may be added 1x to its product's max_multiplier times (seed 3).
+/// Extra toppings on the whole pizza (UQ29): a topping's multiplier runs from 1 to its max_multiplier (seed 3).
 /// The charge is the topping's rounded unit price x multiplier, then x quantity (decision J: round before multiplying).
 /// Half and quarter placements stay designed, not built (A69).
 /// </summary>

@@ -62,7 +62,7 @@ public class TipInputParserTests
         error.ShouldBe(new FieldError("tip.value", "TIP_INVALID", "Enter a tip, or choose No tip."));
     }
 
-    // A value without a mode used to be silently dropped (no tip); it is an error, so a tip is never lost quietly.
+    // A value without a mode is an error rather than no tip, so a tip is never lost quietly.
     [Theory]
     [InlineData(null)]
     [InlineData("None")]
@@ -73,7 +73,7 @@ public class TipInputParserTests
         error.ShouldBe(new FieldError("tip.mode", "TIP_INVALID", "Choose Amount or Percent for the tip, or leave the tip empty."));
     }
 
-    // Values too large for any limit are out of range, never an overflow (a 28-digit decimal x 100 used to throw: 500).
+    // Values too large for any limit are out of range, not an overflow and a 500 (a 28-digit decimal x 100 overflows).
     [Theory]
     [InlineData("Amount", "999999999999999999999")]
     [InlineData("Amount", "1000000000000000000000000000")]

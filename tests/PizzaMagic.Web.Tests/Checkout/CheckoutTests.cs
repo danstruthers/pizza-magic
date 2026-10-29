@@ -297,8 +297,8 @@ public class CheckoutTests
         factory.OrderManager.QuoteRequests.ShouldBeEmpty();
     }
 
-    // Code review: with the cart locked on one ticket (an outage), placing another ticket (an older Review page in
-    // another tab) used to replace the lock and could create a second order nobody would see. The lock wins.
+    // With the cart locked on one ticket after an outage, placing another ticket (an older Review page in another tab)
+    // could create a second order nobody would see, so the lock wins and the pending order is shown.
     [Fact]
     public async Task Another_ticket_while_locked_shows_the_pending_order_instead()
     {

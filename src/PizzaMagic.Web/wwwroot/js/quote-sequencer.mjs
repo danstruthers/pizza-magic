@@ -42,7 +42,7 @@ export function createQuoteSequencer({
       onBusyChange(false);   // before drawing, so the drawing (e.g. a greyed stale total) has the last word
       onResponse(response, job.draft);
       if (response.status === 0 || response.status >= 500) {
-        // The total really is retried: the same draft again after retryMs, unless a newer edit replaces it first.
+        // Retry the same draft after retryMs, unless a newer edit replaces it first.
         timer = setTimer(() => request(job.draft), retryMs);
       }
     } else if (pending !== null) {

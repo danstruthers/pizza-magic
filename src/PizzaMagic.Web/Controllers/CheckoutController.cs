@@ -90,9 +90,9 @@ public sealed class CheckoutController(
             return View(nameof(Review), Pending(pending, pendingReview) with { Banner = EarlierOrderPending });
         }
 
-        // Lock first, and store the lock before the order service hears of the order, so a dropped connection can't
-        // leave an unlocked cart behind an order that may exist. The call itself isn't tied to the browser either:
-        // once sent it gets a definitive answer (the client's timeouts bound it), whether or not the phone is still there.
+        // Commit the lock before the order service hears of the order, so a dropped connection can't leave an unlocked
+        // cart behind an order that may exist. The call isn't tied to the browser either (CancellationToken.None): it
+        // runs to an answer or the client's timeout even if the customer has gone.
         cart = cart with { PendingTicket = ticket };
         CartStore.Save(HttpContext.Session, cart);
         await HttpContext.Session.CommitAsync();

@@ -74,7 +74,7 @@ public sealed class OrdersController(OrderService orders) : ControllerBase
         CancellationToken cancellationToken) =>
         this.ToHttp(await orders.UpdateAsync(orderId, request, ifMatch, idempotencyKey, cancellationToken), StatusCodes.Status200OK);
 
-    /// <summary>Cancel while Not Started; cancelling a cancelled order is an idempotent 200.</summary>
+    /// <summary>Cancel while Not Started; cancelling a cancelled order is an idempotent 200. If-Match is optional, enforced if sent.</summary>
     [HttpPost("{orderId:guid}/cancel")]
     [ProducesResponseType<OrderResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]

@@ -44,7 +44,8 @@ public class OrderSnapshotTests
         (await quote.ReadJsonAsync()).FieldErrors().ShouldBe([("lineItems[0].toppings[0].code", "PRODUCT_UNAVAILABLE")]);
     }
 
-    // Records live 24 h; an expired key can be reused for a new order (the expired row is deleted in the write).
+    // Idempotency records live 24 h; an expired key can be reused for a new order (the expired row is deleted in
+    // the write).
     [Fact]
     public async Task Expired_key_reuse_creates_new_order()
     {

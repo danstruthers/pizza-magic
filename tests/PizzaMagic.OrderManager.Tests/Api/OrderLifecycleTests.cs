@@ -84,7 +84,8 @@ public class OrderLifecycleTests(ApiFactory factory) : IClassFixture<ApiFactory>
         (await CountAsync($"SELECT COUNT(*) FROM order_status_history WHERE order_id = '{order.OrderId}' AND event_type = 'Updated' AND order_version = 2")).ShouldBe(1);
     }
 
-    // Edit_path_SaveChanges_after_version_bump_does_not_throw: consecutive edits each bump the version.
+    // Plan's Edit_path_SaveChanges_after_version_bump_does_not_throw: the order row is never tracked, so a second edit
+    // after a version bump succeeds and bumps it again.
     [Fact]
     public async Task Consecutive_updates_bump_the_version_each_time()
     {

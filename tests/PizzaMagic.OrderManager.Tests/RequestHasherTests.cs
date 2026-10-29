@@ -30,8 +30,8 @@ public class RequestHasherTests
         RequestHasher.HashCreate(noisy).ShouldBe(RequestHasher.HashCreate(plain));
     }
 
-    // Request_hash_is_computed_before_catalog_load: the hash uses only the request, never catalog data, so two
-    // bodies that differ only in how placements were written are different requests.
+    // The hash covers only the request, never catalog data, so two LEFT entries and one LEFT 2x are different
+    // requests even though placement normalization (X1) would bill them the same.
     [Fact]
     public void Request_hash_is_computed_before_catalog_load()
     {

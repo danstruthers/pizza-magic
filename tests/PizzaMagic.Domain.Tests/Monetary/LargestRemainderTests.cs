@@ -59,7 +59,7 @@ public class LargestRemainderTests
     [Fact]
     public void Large_values_do_not_overflow()
     {
-        // amount x weight is about 10^36 here, far beyond long, so the Int128 path is exercised.
+        // amount x weight is about 10^37 here, far beyond long, so the Int128 path is exercised.
         var shares = LargestRemainder.Allocate(long.MaxValue / 2, new long[] { long.MaxValue / 3, long.MaxValue / 3 });
         shares.Sum().ShouldBe(long.MaxValue / 2);
     }

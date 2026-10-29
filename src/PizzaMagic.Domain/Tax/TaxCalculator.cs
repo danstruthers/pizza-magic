@@ -50,7 +50,7 @@ public static class TaxCalculator
         return new TaxResult(new Money(tax), lines, settings);
     }
 
-    /// <summary>The only caller of the truncating policy (plan section 9.2).</summary>
+    /// <summary>The only caller of <see cref="Rounding.Truncate"/>; a source-scan test enforces this (plan section 9.2).</summary>
     private static long RoundTax(long numerator, TaxRoundingMethod method) => method switch
     {
         TaxRoundingMethod.HalfUp => Rounding.RoundHalfAwayFromZero(numerator, Money.PpmScale),

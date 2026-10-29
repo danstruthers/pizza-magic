@@ -8,7 +8,7 @@ using PizzaMagic.EndToEnd.Tests.Hosting;
 namespace PizzaMagic.EndToEnd.Tests.Flows;
 
 /// <summary>
-/// The customer's journeys through the real order builder and the real order service (plan section 7.4, M15): every
+/// The customer's journeys through the real order builder and the real order service (plan section 7.4): every
 /// total the browser sees, Review shows and the database stores is the same number.
 /// </summary>
 public class FlowTests

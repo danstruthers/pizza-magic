@@ -11,7 +11,7 @@ public enum SeedProfile
 public sealed class DatabaseProfileException(string message) : Exception(message);
 
 /// <summary>
-/// The database the order service runs on (M15F). The profile comes from <c>Seed:Profile</c>, which the
+/// The database the order service runs on. The profile comes from <c>Seed:Profile</c>, which the
 /// <c>--database</c> command-line switch maps to; it picks the seed scripts and the default file, so the two
 /// databases live side by side and never touch each other. An explicit <c>ConnectionStrings:PizzaMagic</c> wins
 /// over the default file, but the profile still picks the scripts.

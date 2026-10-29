@@ -3,7 +3,7 @@ namespace PizzaMagic.Contracts.Api;
 // Wire contract for /api/v1 (plan section 5): camelCase JSON, money in integer cents, codes are catalog codes.
 // Request fields are nullable so the server's validator, not model binding, reports every problem with its path.
 
-/// <summary>A draft to price (POST /api/v1/quotes). Submit and update reuse the same shape in M10.</summary>
+/// <summary>A draft to price (POST /api/v1/quotes). Submit and update carry the same draft fields.</summary>
 public sealed record QuoteRequest(
     long? RestaurantId,
     string? Channel,
@@ -70,6 +70,10 @@ public sealed record PricedProductResponse(string Code, string Name, long PriceC
 
 public sealed record PricedChoiceResponse(string Code, string Name, long PriceCents, bool IsDefault);
 
+/// <summary>
+/// A priced topping. The built scope always sends portion WHOLE and a coverage factor of 1 000 000 ppm, so the
+/// placement unit charge is the topping unit price; the fields are kept for placements (X1).
+/// </summary>
 public sealed record PricedToppingResponse(
     string Code,
     string Name,

@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace PizzaMagic.EndToEnd.Tests.Architecture;
 
 /// <summary>
-/// Single source of truth and explicit rounding (plan section 9.2, items 2 and 3), checked on the source text with
+/// Single source of truth and explicit rounding (plan section 9.2, item 2), checked on the source text with
 /// comments and strings removed.
 /// </summary>
 public partial class RoundingScanTests

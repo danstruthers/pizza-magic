@@ -4,11 +4,11 @@ using PizzaMagic.Contracts.Api;
 namespace PizzaMagic.Web.Models.Session;
 
 /// <summary>
-/// The customer's cart, kept in the ASP.NET Core Session (plan section 6.2). <see cref="Revision"/> is incremented by
-/// the page on every edit, so an older draft never overwrites a newer one (best effort; Place uses a review ticket,
-/// never this cart, M14). The submission key and edit fields are used by checkout (M14). An order being changed is
-/// priced at its own restaurant and channel; <see cref="LastPlacedOrderId"/> keeps the last order findable even if
-/// the response that placed it never reached the browser.
+/// The customer's cart, kept in the ASP.NET Core Session (plan section 6.2). The page increments
+/// <see cref="Revision"/> on every edit, so an older draft never overwrites a newer one (best effort: Place submits a
+/// review ticket, never this cart). <see cref="PendingTicket"/> locks the cart while an order waits for confirmation.
+/// An order being changed is priced at its own restaurant and channel; <see cref="LastPlacedOrderId"/> keeps the last
+/// order findable even if the response that placed it never reached the browser.
 /// </summary>
 public sealed record CartState(
     long Revision,

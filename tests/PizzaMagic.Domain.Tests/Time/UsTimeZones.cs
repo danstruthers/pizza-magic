@@ -5,7 +5,8 @@ namespace PizzaMagic.Domain.Tests.Time;
 /// <summary>
 /// US time zone offset periods for [2020-01-01, 2041-01-01) UTC, built from the US rule in force since 2007
 /// (DST from the second Sunday of March 02:00 local to the first Sunday of November 02:00 local).
-/// Stands in for data/seed/0000-time-zones.sql until M8, whose seed test checks the real file against tzdb.
+/// Stands in for data/seed/0000-time-zones.sql, which Domain tests don't read; the OrderManager seed tests check
+/// the real file against tzdb.
 /// </summary>
 public static class UsTimeZones
 {

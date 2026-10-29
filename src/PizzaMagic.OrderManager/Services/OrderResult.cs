@@ -23,7 +23,7 @@ public enum OrderOutcome
     NotModifiable,
     NotCancellable,
     InvalidTransition,
-    /// <summary>412: If-Match names an older version.</summary>
+    /// <summary>412: If-Match doesn't name the current version.</summary>
     VersionMismatch,
     /// <summary>422 validation.</summary>
     Invalid,

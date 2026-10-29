@@ -36,7 +36,7 @@ public static class Repository
 /// </summary>
 public static class SourceScan
 {
-    /// <summary>Source files under a repository folder, excluding build output and migrations' designer files.</summary>
+    /// <summary>Source files under a repository folder, excluding build output (bin and obj).</summary>
     public static IEnumerable<string> Files(string folder, string pattern) =>
         Directory.EnumerateFiles(Path.Combine(Repository.Root, folder), pattern, SearchOption.AllDirectories)
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")

@@ -16,7 +16,7 @@ public sealed record DataScriptResult(string Name, DataScriptOutcome Outcome);
 public sealed class DataScriptChangedException(string message) : Exception(message);
 
 /// <summary>
-/// Applies the SQL data scripts in data/seed in name order (plan section 2.12). Each script runs once, in its own
+/// Applies the SQL data scripts under data/ (plan section 2.12). Each script runs once, in its own
 /// transaction, and is logged with its SHA-256 in data_script_log. Same name and hash: no-op. Same name, different
 /// hash: refused before anything runs.
 /// </summary>
@@ -26,7 +26,7 @@ public sealed class DataScriptRunner(PizzaMagicDbContext db, TimeProvider clock)
         ApplyAsync(dataDirectory, SeedProfile.Default, cancellationToken);
 
     /// <summary>
-    /// Applies data/seed/*.sql in name order, then the profile's own scripts (M15F: the fantasy realm). A database
+    /// Applies data/seed/*.sql in name order, then the profile's own scripts (the fantasy realm's). A database
     /// belongs to one profile: the default profile refuses a database holding the fantasy realm, and the fantasy
     /// profile refuses a database first seeded without it, so neither dataset is ever applied to the other's file.
     /// </summary>

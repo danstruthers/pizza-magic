@@ -3,7 +3,7 @@ using PizzaMagic.Domain.Catalog;
 namespace PizzaMagic.Domain.Pricing;
 
 /// <summary>
-/// Pipeline step 0 (plan section 5.2): every field rule, collecting all errors with their JSON paths.
+/// Pipeline step 0 (plan sections 2.3 and 5.2): every field rule, collecting all errors with their JSON paths.
 /// Limits come from the restaurant's ordering policy; products must be available at this restaurant.
 /// Promo codes are never field errors here (they get per-code outcomes).
 /// </summary>

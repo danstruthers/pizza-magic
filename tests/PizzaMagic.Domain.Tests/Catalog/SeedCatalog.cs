@@ -3,7 +3,7 @@ using PizzaMagic.Domain.Catalog;
 namespace PizzaMagic.Domain.Tests.Catalog;
 
 /// <summary>
-/// Mirrors the planned seed rows in data/seed/0001-core.sql (plan section 4.5), so Domain tests
+/// Mirrors the seed rows in data/seed/0001-core.sql (plan section 4.5), so Domain tests
 /// can run without a database. Tests derive variants with <c>with</c> expressions.
 /// </summary>
 public static class SeedCatalog

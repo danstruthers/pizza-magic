@@ -12,8 +12,8 @@ using static PizzaMagic.OrderManager.Tests.Api.OrderApiTests;
 namespace PizzaMagic.OrderManager.Tests.Api;
 
 /// <summary>
-/// Server-side validation of malformed and oversized requests (code review, 2026-10-28): every bad request is a 4xx
-/// problem with a field path, never a 500, and a response is never many times larger than its request.
+/// Malformed and oversized requests: each is a 4xx problem with a field path, never a 500, and an oversized list gets
+/// one error rather than one per entry, so a response is never many times larger than its request.
 /// </summary>
 public class MalformedRequestTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
@@ -63,7 +63,7 @@ public class MalformedRequestTests(ApiFactory factory) : IClassFixture<ApiFactor
         await ShouldBe422(response, ("tip.value", "TIP_OUT_OF_RANGE"));
     }
 
-    // productCode belongs to add-on lines (designed, not built); on a pizza line it was accepted and silently ignored.
+    // productCode belongs to add-on lines (designed, not built); on a pizza line it is refused, not silently ignored.
     [Fact]
     public async Task Product_code_on_a_pizza_line_is_refused()
     {
@@ -72,7 +72,7 @@ public class MalformedRequestTests(ApiFactory factory) : IClassFixture<ApiFactor
         await ShouldBe422(response, ("lineItems[0].productCode", "FIELD_NOT_ALLOWED"));
     }
 
-    // Too many lines: one error, not one per line (a 15 MB request used to produce a 63 MB response).
+    // Too many lines is one error, not one per line, so a huge request can't produce an even larger response.
     [Fact]
     public async Task Too_many_lines_is_one_error()
     {
@@ -93,7 +93,7 @@ public class MalformedRequestTests(ApiFactory factory) : IClassFixture<ApiFactor
         await ShouldBe422(response, ("lineItems[0].toppings", "TOO_MANY_TOPPINGS"));
     }
 
-    // Duplicates collapse, but the raw list is capped: 100,000 copies of a code used to return 99,999 outcomes.
+    // Duplicates collapse, but the raw list is capped too: thousands of copies of a code can't return an outcome each.
     [Fact]
     public async Task Too_many_promo_code_entries_is_one_error()
     {
@@ -113,7 +113,7 @@ public class MalformedRequestTests(ApiFactory factory) : IClassFixture<ApiFactor
         response.Content.Headers.ContentType!.MediaType.ShouldBe("application/problem+json");
     }
 
-    // An unexpected exception is a problem document too (it was an empty 500), so clients always get a body to read.
+    // An unexpected exception is a problem document too, so clients always get a body to read.
     [Fact]
     public async Task Unexpected_exception_is_a_problem_document()
     {

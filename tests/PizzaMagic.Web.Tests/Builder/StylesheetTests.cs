@@ -4,9 +4,9 @@ using System.Text.RegularExpressions;
 namespace PizzaMagic.Web.Tests.Builder;
 
 /// <summary>
-/// The app ships Bootstrap 5.1 (wwwroot/lib). A colour class it doesn't define renders nothing at all: badges built with
-/// Bootstrap 5.2's <c>text-bg-*</c> showed white text on no background, so statuses and promo codes were invisible
-/// while every text-based test still passed. Every colour class the app uses must exist in the shipped stylesheet.
+/// The app ships Bootstrap 5.1 (wwwroot/lib), where an undefined color class renders nothing: badges built with
+/// Bootstrap 5.2's <c>text-bg-*</c> showed white text on no background, invisible to text-based tests. Every color
+/// class the app uses must exist in the shipped stylesheet.
 /// </summary>
 public partial class StylesheetTests
 {

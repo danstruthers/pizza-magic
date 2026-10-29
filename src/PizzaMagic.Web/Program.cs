@@ -17,13 +17,12 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 builder.Services.AddAntiforgery(options => options.HeaderName = "RequestVerificationToken");
-// Checkout seals what Review showed into a ticket; recent orders live in a cookie (plan section 6.2).
+// Checkout seals what Review showed into a ticket (plan section 6.2); recent orders live in a cookie.
 builder.Services.AddSingleton<ReviewTicketProtector>();
 builder.Services.AddSingleton<RecentOrdersCookie>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");

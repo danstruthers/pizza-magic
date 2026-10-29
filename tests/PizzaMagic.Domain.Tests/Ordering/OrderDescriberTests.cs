@@ -41,7 +41,7 @@ public class OrderDescriberTests
             .ShouldBe(["1 x Small pizza (no toppings)", "1 x Large pizza with Garlic"]);
     }
 
-    // P9: footer lines carry amounts and the tip's mode and rate; text is rendered by each host.
+    // P9: footer lines carry amounts in cents and the tip's mode and rate; each host formats the money.
     [Fact]
     public void Footer_lines_structured()
     {

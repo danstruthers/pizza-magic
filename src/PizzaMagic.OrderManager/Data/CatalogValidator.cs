@@ -75,7 +75,7 @@ public sealed partial class CatalogValidator(
         }
     }
 
-    /// <summary>TZ8-TZ10: each zone in use has contiguous, non-overlapping periods covering [now - 1 y, now + 5 y].</summary>
+    /// <summary>Each zone an active restaurant uses has contiguous, non-overlapping periods covering [now - 1 y, now + 5 y].</summary>
     private async Task CheckTimeZonesAsync(List<RestaurantEntity> restaurants, List<string> errors, CancellationToken cancellationToken)
     {
         var zones = await db.TimeZones.AsNoTracking().ToListAsync(cancellationToken);
@@ -171,7 +171,7 @@ public sealed partial class CatalogValidator(
         }
     }
 
-    /// <summary>Every promotion's kinds are registered and their parameters parse; time-valued keys end in Local (TZ12).</summary>
+    /// <summary>Every promotion's kinds are registered and their parameters parse; time-valued keys end in Local and carry no zone (UQ16).</summary>
     private async Task CheckPromotionsAsync(List<string> errors, CancellationToken cancellationToken)
     {
         var conditions = (await db.PromotionConditions.AsNoTracking().ToListAsync(cancellationToken)).ToLookup(c => c.PromotionId);

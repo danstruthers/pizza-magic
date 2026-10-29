@@ -8,8 +8,8 @@ using PizzaMagic.OrderManager.Services;
 namespace PizzaMagic.OrderManager.Controllers;
 
 /// <summary>
-/// The restaurant side (plan section 5.4): moves an order to its next status. No auth, per the spec; in production it
-/// would sit behind restaurant authentication.
+/// The restaurant side (plan section 5.4): lists the active orders and moves an order to its next status. No auth, per
+/// the spec; in production it would sit behind restaurant authentication.
 /// </summary>
 [ApiController]
 [Route("api/v1/kitchen/orders")]

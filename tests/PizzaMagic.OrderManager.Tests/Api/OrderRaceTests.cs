@@ -10,8 +10,8 @@ using static PizzaMagic.OrderManager.Tests.Api.OrderLifecycleTests;
 namespace PizzaMagic.OrderManager.Tests.Api;
 
 /// <summary>
-/// Races on a real temp-file database (plan section 7.4): two requests released together by a Barrier, 50 times.
-/// The conditional UPDATE decides; exactly one of {cancel, kitchen start} commits and the loser gets a definitive 409.
+/// Races on a real temp-file database (plan section 7.4): requests released together by a Barrier, many times over.
+/// Conditional UPDATEs decide: one racer commits, every other gets a definitive answer, and nothing is lost or doubled.
 /// </summary>
 public class OrderRaceTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
@@ -125,8 +125,6 @@ public class OrderRaceTests(ApiFactory factory) : IClassFixture<ApiFactory>
         }
     }
 
-    // Code review: the races below were untested. Each runs 50 times on a real database.
-
     private async Task<long> UpdatesAsync(string orderId)
     {
         await using var connection = new SqliteConnection(factory.ConnectionString);
@@ -222,8 +220,8 @@ public class OrderRaceTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     /// <summary>
     /// The naive variant (test project only): read the status, check it, then write unconditionally. With both racers
-    /// held after their read, both "succeed": the bug the conditional UPDATE prevents. (That the race tests above
-    /// catch it was checked by removing the status condition from the real cancel; see docs/ai-log.md, M11.)
+    /// held after their read, both "succeed": the bug the conditional UPDATE prevents. (That the cancel-vs-start race
+    /// tests catch it was checked by removing the status condition from the real cancel; see docs/ai-log.md, M11.)
     /// </summary>
     [Fact]
     public async Task Naive_check_then_act_double_succeeds()

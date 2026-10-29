@@ -10,7 +10,7 @@ namespace PizzaMagic.OrderManager.Services;
 /// <summary>Maps Domain results onto the wire contract. Every number is the Domain's; nothing is recomputed here.</summary>
 public static class ResponseMapper
 {
-    /// <summary>Built scope (A69): every topping is a whole 1x placement at the WHOLE factor.</summary>
+    /// <summary>Built scope (A69): every topping covers the whole pizza at the WHOLE factor, at a multiplier of 1 or more (UQ29).</summary>
     private const string WholeLabel = "whole";
 
     public static QuoteResponse ToQuote(PricingOutcome outcome)

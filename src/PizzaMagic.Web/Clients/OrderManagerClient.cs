@@ -149,8 +149,9 @@ public sealed class OrderManagerClient(IHttpClientFactory factory, ILogger<Order
 
 /// <summary>
 /// Registration (plan section 6.5): the standard resilience handler on both clients. POST and PUT retries are
-/// deliberately allowed (DisableForUnsafeHttpMethods is not called): they are safe only because every mutation
-/// carries an Idempotency-Key, so a retried submit or update replays instead of acting twice. 4xx is never retried.
+/// deliberately allowed (DisableForUnsafeHttpMethods is not called): a retried submit or update carries the same
+/// Idempotency-Key and replays instead of acting twice, a repeated cancel or advance is a no-op, and a quote changes
+/// nothing. Apart from 408 and 429, a 4xx is never retried.
 /// </summary>
 public static class OrderManagerClientRegistration
 {

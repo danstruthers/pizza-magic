@@ -11,11 +11,11 @@ using PizzaMagic.OrderManager.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// The largest legitimate order is a few KB; refuse anything near a megabyte before it is read.
+// The largest legitimate order is a few KB; refuse a body over 1 MB before it is read.
 builder.WebHost.ConfigureKestrel(kestrel => kestrel.Limits.MaxRequestBodySize = 1024 * 1024);
 
-// M15F: --database default|fantasy (= Seed:Profile) picks the seed data and its file; both files sit side by side in
-// the working folder (pizzamagic.db, pizzamagic-fantasy.db). An explicit ConnectionStrings:PizzaMagic wins over the file.
+// --database default|fantasy (= Seed:Profile) picks the seed data and its file; both files sit side by side in the
+// working folder (pizzamagic.db, pizzamagic-fantasy.db). An explicit ConnectionStrings:PizzaMagic wins over the file.
 // A bad option, or a file holding the other dataset, stops startup with one line and exit code 2.
 builder.Configuration.AddCommandLine(args, DatabaseSelection.SwitchMappings);
 DatabaseSelection database;

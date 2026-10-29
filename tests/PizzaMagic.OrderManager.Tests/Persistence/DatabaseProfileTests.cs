@@ -12,8 +12,9 @@ using PizzaMagic.OrderManager.Data;
 namespace PizzaMagic.OrderManager.Tests.Persistence;
 
 /// <summary>
-/// M15F: the default and fantasy databases live side by side; <c>--database</c> (Seed:Profile) picks one, defaulting
-/// to the normal database, and neither profile ever applies its scripts to the other's file.
+/// Fantasy realm (plan section 7.5): the default and fantasy databases live side by side; <c>--database</c>
+/// (Seed:Profile) picks one, defaulting to the normal database, and neither profile ever applies its scripts to the
+/// other's file.
 /// </summary>
 public class DatabaseProfileTests
 {
@@ -159,7 +160,8 @@ public class DatabaseProfileTests
     }
 
     // The real service, as a process: a bad --database stops startup with one clear line and exit code 2, not a stack
-    // trace; a valueless --database is refused too (the command-line provider would silently drop it: default database).
+    // trace; a valueless --database is refused too (the command-line provider would otherwise drop it silently and
+    // open the default database).
     [Theory]
     [InlineData("Unknown database 'dragons'", "--database", "dragons")]
     [InlineData("--database needs a value: default or fantasy.", "--database")]

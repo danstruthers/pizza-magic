@@ -1,4 +1,4 @@
-// node --test tests/js
+// node --test "tests/js/*.test.mjs"
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -152,8 +152,8 @@ test('formatBasisPoints_matches_csharp_cases', () => {
   assert.equal(formatBasisPointsCompact(1000), '10%');
 });
 
-// Code review: "Total unavailable — retrying" was shown but nothing retried until the next edit; and the busy flag was
-// cleared after the response was drawn, which un-greyed a stale total.
+// Retries: "Total unavailable — retrying" must retry on a timer, not wait for the next edit; and busy must clear
+// before the response is drawn, or clearing it would un-grey a stale total.
 function retryHarness() {
   const timers = [];
   const sent = [];

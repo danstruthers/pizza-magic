@@ -99,7 +99,7 @@ public class PizzaLinePricerTests
         line.Components[0].Source.ShouldBe(PriceSource.Restaurant);
     }
 
-    // Input is validated before pricing (DraftValidator, M5); the pricer refuses anything it cannot price.
+    // DraftValidator checks input before pricing, so the pricer throws on anything it cannot price.
     [Fact]
     public void Unavailable_or_unknown_input_throws()
     {

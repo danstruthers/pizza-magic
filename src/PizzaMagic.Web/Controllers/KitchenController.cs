@@ -6,9 +6,9 @@ using PizzaMagic.Web.Models;
 namespace PizzaMagic.Web.Controllers;
 
 /// <summary>
-/// The simulated restaurant side (spec requirement 5: "simulate this however you like"): the active orders, oldest
-/// first, each with one button for its next step. The button sends the status the order had when the page was drawn,
-/// so a stale page or a double click can't skip a step. No auth, like the order service's kitchen endpoint.
+/// The simulated restaurant side (UQ30): the active orders, oldest first, each with one button for its next step. The
+/// button sends the status the order had when the page was drawn, so a stale page or a double click can't skip a step.
+/// No auth, like the order service's kitchen endpoint.
 /// </summary>
 public sealed class KitchenController(IOrderManagerClient orderManager, IConfiguration configuration) : Controller
 {

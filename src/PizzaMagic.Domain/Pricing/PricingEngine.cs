@@ -54,7 +54,7 @@ public sealed class PricingEngine(PromotionEngine promotions)
         var tip = TipCalculator.Calculate(tipInput, bill);
         var total = bill + tip;
 
-        // 11. Normalized draft and canSubmit.
+        // 11. Normalized draft and canSubmit. (Step 10, the description, is built from the breakdown by OrderDescriber.)
         var issues = lines.Count == 0 ? new List<PricingIssue> { new("ORDER_EMPTY", "Add at least one pizza to your order.") } : [];
         var normalized = new OrderDraft(lines.Select(l => Normalize(l.Line)).ToList(), promotionResult.NormalizedPromoCodes, draft.Tip);
         var canSubmit = lines.Count > 0

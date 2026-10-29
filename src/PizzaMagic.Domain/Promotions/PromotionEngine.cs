@@ -163,7 +163,8 @@ public sealed class PromotionEngine(PromotionRegistry registry, IConflictPolicy 
 
     /// <summary>
     /// The validity window in the restaurant's local time (UQ16): each boundary resolves to the earliest UTC
-    /// instant its local clock reads it, then the comparison is half-open on UTC. Outside coverage: fail closed.
+    /// instant at which the local clock reads it or later, then [from, to) is compared on UTC. Outside the zone's
+    /// coverage the promotion fails closed (Misconfigured).
     /// </summary>
     private static PromoStatus? WindowStatus(PromotionDefinition promotion, PromotionContext context)
     {
