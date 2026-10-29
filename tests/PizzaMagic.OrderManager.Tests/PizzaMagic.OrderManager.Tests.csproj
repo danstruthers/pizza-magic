@@ -24,6 +24,8 @@
     <ProjectReference Include="..\..\src\PizzaMagic.OrderManager\PizzaMagic.OrderManager.csproj" />
     <!-- Only for Time_zone_seed_matches_tzdb: the committed seed must equal the generator's output. -->
     <ProjectReference Include="..\..\tools\PizzaMagic.TzSeedGen\PizzaMagic.TzSeedGen.csproj" />
+    <!-- Only for Committed_fantasy_realm_equals_generator_output (M15F), the same rule for the fantasy realm. -->
+    <ProjectReference Include="..\..\tools\PizzaMagic.FantasySeedGen\PizzaMagic.FantasySeedGen.csproj" />
   </ItemGroup>
 
 </Project>

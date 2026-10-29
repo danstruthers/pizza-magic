@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dev-time only: generates data/test/fantasy-realm.sql, the fantasy realm test database (UQ26, M15F).
+       Nothing under src/ may reference this project. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+</Project>

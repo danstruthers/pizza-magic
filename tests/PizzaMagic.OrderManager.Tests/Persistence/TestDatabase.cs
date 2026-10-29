@@ -28,13 +28,19 @@ public sealed class TestDatabase : IAsyncDisposable
     /// <summary>The repository's data/ folder as copied next to the test binaries.</summary>
     public static string DataDirectory => Path.Combine(AppContext.BaseDirectory, "data");
 
-    /// <summary>A migrated database with every seed script applied, but not validated.</summary>
-    public static async Task<TestDatabase> CreateSeededAsync()
+    /// <summary>A migrated database with the profile's seed scripts applied, but not validated.</summary>
+    public static async Task<TestDatabase> CreateSeededAsync(SeedProfile profile = SeedProfile.Default)
     {
         var database = new TestDatabase();
-        await using var db = database.NewContext();
-        await DatabaseInitializer.MigrateAndSeedAsync(db, DataDirectory, database.Clock);
+        await database.SeedAsync(profile);
         return database;
+    }
+
+    /// <summary>Runs the startup migrate-and-seed step (again) on this database file with the given profile.</summary>
+    public async Task SeedAsync(SeedProfile profile)
+    {
+        await using var db = NewContext();
+        await DatabaseInitializer.MigrateAndSeedAsync(db, DataDirectory, Clock, profile);
     }
 
     /// <summary>An empty database file with no schema.</summary>
