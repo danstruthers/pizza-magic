@@ -109,7 +109,7 @@ public class OrderManagerClientTests
     [Fact]
     public async Task Version_mismatch_and_not_found_are_problems()
     {
-        var stale = await ClientFor(new StubHandler(Problem(HttpStatusCode.PreconditionFailed, "version-mismatch", """, "currentVersion": 3"""))).CancelAsync(OrderId, CancellationToken.None);
+        var stale = await ClientFor(new StubHandler(Problem(HttpStatusCode.PreconditionFailed, "version-mismatch", """, "currentVersion": 3"""))).CancelAsync(OrderId, 2, CancellationToken.None);
         stale.Problem!.Type.ShouldBe(ProblemTypes.VersionMismatch);
         stale.Problem.Extension("currentVersion")!.Value.GetInt32().ShouldBe(3);
 
@@ -175,7 +175,7 @@ public class OrderManagerClientTests
         await client.GetMenuAsync(2, CancellationToken.None);
         await client.GetMenuAsync(null, CancellationToken.None);
         await client.GetStatusAsync(OrderId, CancellationToken.None);
-        await client.CancelAsync(OrderId, CancellationToken.None);
+        await client.CancelAsync(OrderId, null, CancellationToken.None);
 
         stub.Requests.Select(r => (r.Method.Method, r.PathAndQuery)).ShouldBe(
         [
@@ -184,6 +184,19 @@ public class OrderManagerClientTests
             ("GET", $"/api/v1/orders/{OrderId}/status"),
             ("POST", $"/api/v1/orders/{OrderId}/cancel"),
         ]);
+    }
+
+    [Fact]
+    public async Task Cancel_sends_If_Match_only_with_a_version()
+    {
+        var stub = new StubHandler(Respond(HttpStatusCode.OK, OrderJson), Respond(HttpStatusCode.OK, OrderJson));
+        var client = ClientFor(stub);
+
+        await client.CancelAsync(OrderId, 3, CancellationToken.None);
+        await client.CancelAsync(OrderId, null, CancellationToken.None);
+
+        stub.Requests[0].Headers["If-Match"].ShouldBe("\"3\"");
+        stub.Requests[1].Headers.ContainsKey("If-Match").ShouldBeFalse();
     }
 
     [Fact]

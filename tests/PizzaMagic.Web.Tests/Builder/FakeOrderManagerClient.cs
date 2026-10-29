@@ -13,7 +13,13 @@ public sealed class FakeOrderManagerClient : IOrderManagerClient
 
     public List<QuoteRequest> QuoteRequests { get; } = [];
 
-    public Task<ApiResult<MenuResponse>> GetMenuAsync(long? restaurantId, CancellationToken cancellationToken) => Task.FromResult(Menu);
+    public List<long?> MenuRequests { get; } = [];
+
+    public Task<ApiResult<MenuResponse>> GetMenuAsync(long? restaurantId, CancellationToken cancellationToken)
+    {
+        MenuRequests.Add(restaurantId);
+        return Task.FromResult(Menu);
+    }
 
     public Task<ApiResult<QuoteResponse>> QuoteAsync(QuoteRequest draft, CancellationToken cancellationToken)
     {
@@ -38,10 +44,14 @@ public sealed class FakeOrderManagerClient : IOrderManagerClient
     public Func<Guid, ApiResult<OrderResponse>> Cancel { get; set; } =
         id => ApiResult<OrderResponse>.Success(SampleOrders.Order("Cancelled", 2, id: id), null, false);
 
-    public List<Guid> CancelRequests { get; } = [];
+    public List<(Guid Id, int? Version)> CancelRequests { get; } = [];
+
+    /// <summary>The cancellation token each submit or update was given (a placed order must not depend on the browser staying connected).</summary>
+    public List<CancellationToken> WriteTokens { get; } = [];
 
     public Task<ApiResult<OrderResponse>> SubmitAsync(SubmitOrderRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
+        WriteTokens.Add(cancellationToken);
         SubmitRequests.Add((request, idempotencyKey));
         return Task.FromResult(Submit(request, idempotencyKey));
     }
@@ -52,13 +62,14 @@ public sealed class FakeOrderManagerClient : IOrderManagerClient
 
     public Task<ApiResult<OrderResponse>> UpdateAsync(Guid orderId, int version, UpdateOrderRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
+        WriteTokens.Add(cancellationToken);
         UpdateRequests.Add((orderId, version, request, idempotencyKey));
         return Task.FromResult(Update(orderId, version, request, idempotencyKey));
     }
 
-    public Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, CancellationToken cancellationToken)
+    public Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, int? version, CancellationToken cancellationToken)
     {
-        CancelRequests.Add(orderId);
+        CancelRequests.Add((orderId, version));
         return Task.FromResult(Cancel(orderId));
     }
 
@@ -140,8 +151,8 @@ public static class SampleOrders
     private static IReadOnlyList<string> Actions(string status) => status == "NotStarted" ? ["update", "cancel"] : [];
 
     /// <summary>1 Large Pepperoni: subtotal $12.96, tax $0.84 (6.5%), total $13.80.</summary>
-    public static OrderResponse Order(string status = "NotStarted", int version = 1, Guid? id = null) => new(
-        (id ?? Id).ToString(), 1, "ONLINE", null, status, Display(status), version,
+    public static OrderResponse Order(string status = "NotStarted", int version = 1, Guid? id = null, long restaurantId = 1) => new(
+        (id ?? Id).ToString(), restaurantId, "ONLINE", null, status, Display(status), version,
         "2026-10-28T19:00:00.000Z", "2026-10-28T19:05:00.000Z",
         new LocalTimeResponse("2026-10-28T12:00:00", -420, "PDT"), new LocalTimeResponse("2026-10-28T12:05:00", -420, "PDT"),
         Actions(status),

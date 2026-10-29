@@ -45,7 +45,7 @@ public sealed class OrderManagerClient(IHttpClientFactory factory) : IOrderManag
             },
             cancellationToken);
 
-    public Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, CancellationToken cancellationToken) =>
+    public Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, int? version, CancellationToken cancellationToken) =>
         SendAsync<OrderResponse>(ClientName, HttpMethod.Post, $"/api/v1/orders/{orderId}/cancel", null, null, cancellationToken);
 
     public Task<ApiResult<KitchenQueueResponse>> GetKitchenQueueAsync(long? restaurantId, CancellationToken cancellationToken) =>

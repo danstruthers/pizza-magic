@@ -22,7 +22,8 @@ public interface IOrderManagerClient
     /// <summary>Sends If-Match: "version" and the idempotency key, so a retry after a lost response replays.</summary>
     Task<ApiResult<OrderResponse>> UpdateAsync(Guid orderId, int version, UpdateOrderRequest request, string idempotencyKey, CancellationToken cancellationToken);
 
-    Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, CancellationToken cancellationToken);
+    /// <summary>With a version, sends If-Match, so a page left open can't cancel an order changed since (412).</summary>
+    Task<ApiResult<OrderResponse>> CancelAsync(Guid orderId, int? version, CancellationToken cancellationToken);
 
     /// <summary>The restaurant side: active orders, oldest first (the simulated kitchen page).</summary>
     Task<ApiResult<KitchenQueueResponse>> GetKitchenQueueAsync(long? restaurantId, CancellationToken cancellationToken);

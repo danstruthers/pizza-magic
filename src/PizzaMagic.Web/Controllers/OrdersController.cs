@@ -85,7 +85,7 @@ public sealed class OrdersController(IOrderManagerClient orderManager, RecentOrd
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancel(Guid id)
     {
-        var result = await orderManager.CancelAsync(id, HttpContext.RequestAborted);
+        var result = await orderManager.CancelAsync(id, null, HttpContext.RequestAborted);
         TempData[CheckoutController.NoticeKey] = result.Kind switch
         {
             ApiResultKind.Success => Cancelled,

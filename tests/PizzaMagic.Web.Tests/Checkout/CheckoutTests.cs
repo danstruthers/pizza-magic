@@ -296,6 +296,106 @@ public class CheckoutTests
         factory.OrderManager.QuoteRequests.ShouldBeEmpty();
     }
 
+    // Code review: with the cart locked on one ticket (an outage), placing another ticket (an older Review page in
+    // another tab) used to replace the lock and could create a second order nobody would see. The lock wins.
+    [Fact]
+    public async Task Another_ticket_while_locked_shows_the_pending_order_instead()
+    {
+        await using var factory = new WebFactory();
+        factory.OrderManager.Quote = _ => Priced(1380);
+        factory.OrderManager.Submit = (_, _) => ApiResult<OrderResponse>.Unavailable("timeout");
+        var client = await CartAsync(factory);
+        var older = await WebFactory.ReviewAsync(client);
+        (await WebFactory.PostQuoteAsync(client, older.Token, WebFactory.Draft(2, "SMALL"))).StatusCode.ShouldNotBe(HttpStatusCode.BadRequest);
+        var newer = await WebFactory.ReviewAsync(client);
+        (await WebFactory.PlaceAsync(client, newer.Token, newer.Ticket!)).StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+
+        var response = await WebFactory.PlaceAsync(client, older.Token, older.Ticket!);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var html = await response.Content.ReadAsStringAsync();
+        WebFactory.Text(html).ShouldContain("Your earlier order is still waiting for confirmation.");
+        WebFactory.Ticket(html).ShouldBe(newer.Ticket);
+        factory.OrderManager.SubmitRequests.Count.ShouldBe(1);
+    }
+
+    // The lock is saved before the order service is called, and the call does not depend on the browser staying
+    // connected: a phone dropping mid-Place must not leave an unlocked cart while the order may exist.
+    [Fact]
+    public async Task Lock_is_saved_before_the_order_service_is_called()
+    {
+        await using var factory = new WebFactory();
+        factory.OrderManager.Quote = _ => Priced(1380);
+        factory.OrderManager.Submit = (_, _) => throw new OperationCanceledException("connection dropped");
+        var client = await CartAsync(factory);
+        var review = await WebFactory.ReviewAsync(client);
+
+        await WebFactory.PlaceAsync(client, review.Token, review.Ticket!);
+
+        factory.OrderManager.WriteTokens.ShouldHaveSingleItem().CanBeCanceled.ShouldBeFalse();
+        WebFactory.Text(await client.GetStringAsync("/")).ShouldContain("We couldn't confirm your order");
+    }
+
+    // If the redirect after Place never reaches the phone, the recent-orders cookie is lost with it. The Session still
+    // knows the order, so the builder and "Your orders" both show it.
+    [Fact]
+    public async Task Placed_order_stays_findable_when_the_response_is_lost()
+    {
+        await using var factory = new WebFactory();
+        factory.OrderManager.Quote = _ => Priced(1380);
+        var jar = new CookieJar();
+        var client = factory.CreateDefaultClient(jar);
+        var token = WebFactory.Token(await client.GetStringAsync("/"));
+        (await WebFactory.PostQuoteAsync(client, token, WebFactory.Draft(1, "LARGE"))).StatusCode.ShouldBe(HttpStatusCode.OK);
+        var review = await WebFactory.ReviewAsync(client);
+        (await WebFactory.PlaceAsync(client, review.Token, review.Ticket!)).StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        jar.Remove("pm_recent");
+
+        var builder = await client.GetStringAsync("/");
+        var recent = await client.GetStringAsync("/Orders");
+
+        WebFactory.Text(builder).ShouldContain("Your order 0f8fad5b was placed.");
+        builder.ShouldContain($"href=\"/Orders/{SampleOrders.Id}\"");
+        recent.ShouldContain(SampleOrders.Id.ToString());
+    }
+
+    [Fact]
+    public async Task Zero_discount_is_not_shown()
+    {
+        await using var factory = new WebFactory();
+        factory.OrderManager.Quote = _ => Priced(1380);
+        var client = await CartAsync(factory);
+
+        (await WebFactory.ReviewAsync(client)).Html.ShouldNotContain("Discounts");
+    }
+
+    /// <summary>A minimal browser cookie store that a test can drop a cookie from.</summary>
+    private sealed class CookieJar : DelegatingHandler
+    {
+        private readonly Dictionary<string, string> _cookies = [];
+
+        public void Remove(string name) => _cookies.Remove(name);
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (_cookies.Count > 0)
+            {
+                request.Headers.Add("Cookie", string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}")));
+            }
+            var response = await base.SendAsync(request, cancellationToken);
+            if (response.Headers.TryGetValues("Set-Cookie", out var values))
+            {
+                foreach (var pair in values.Select(v => v.Split(';')[0]))
+                {
+                    var at = pair.IndexOf('=');
+                    var (name, value) = (pair[..at], pair[(at + 1)..]);
+                    if (value.Length == 0) _cookies.Remove(name); else _cookies[name] = value;
+                }
+            }
+            return response;
+        }
+    }
+
     [Fact]
     public async Task Review_says_so_when_the_service_is_unavailable()
     {

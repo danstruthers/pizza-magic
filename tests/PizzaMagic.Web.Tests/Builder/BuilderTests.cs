@@ -57,6 +57,29 @@ public class BuilderTests
     }
 
     [Fact]
+    public async Task Quote_without_a_body_is_400_not_500()
+    {
+        await using var factory = new WebFactory();
+        var (client, token) = await factory.BrowserAsync();
+        var request = new HttpRequestMessage(HttpMethod.Post, "/Builder/Quote") { Content = new StringContent("null", System.Text.Encoding.UTF8, "application/json") };
+        request.Headers.Add("RequestVerificationToken", token);
+
+        (await client.SendAsync(request)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    // Screen readers hear the total change; tip presets say which one is chosen.
+    [Fact]
+    public async Task Total_is_announced_and_tip_presets_have_a_pressed_state()
+    {
+        await using var factory = new WebFactory();
+
+        var html = await factory.CreateClient().GetStringAsync("/");
+
+        System.Text.RegularExpressions.Regex.IsMatch(html, "id=\"total-panel\"[^>]*aria-live=\"polite\"").ShouldBeTrue();
+        System.Text.RegularExpressions.Regex.IsMatch(html, "class=\"[^\"]*tip-preset[^\"]*\"[^>]*aria-pressed=\"false\"").ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task Builder_says_so_when_the_menu_is_unavailable()
     {
         await using var factory = new WebFactory();

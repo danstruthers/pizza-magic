@@ -123,6 +123,27 @@ public class KitchenPageTests
     }
 
     [Fact]
+    public async Task Kitchen_explains_an_unknown_restaurant()
+    {
+        await using var factory = new WebFactory();
+        factory.OrderManager.KitchenQueue = _ => ApiResult<KitchenQueueResponse>.Failed(Problems.Of(ProblemTypes.RestaurantNotFound, 404));
+
+        var (_, raw) = await KitchenAsync(factory);
+
+        WebFactory.Text(raw).ShouldContain("This kitchen's restaurant doesn't exist. Check OrderManager:RestaurantId.");
+    }
+
+    [Fact]
+    public async Task Auto_refresh_is_in_the_head()
+    {
+        await using var factory = new WebFactory();
+
+        var (_, raw) = await KitchenAsync(factory);
+
+        raw.IndexOf("http-equiv=\"refresh\"", StringComparison.Ordinal).ShouldBeInRange(0, raw.IndexOf("</head>", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Layout_links_to_the_kitchen()
     {
         await using var factory = new WebFactory();

@@ -151,3 +151,77 @@ test('formatBasisPoints_matches_csharp_cases', () => {
   assert.equal(formatBasisPointsCompact(1825), '18.25%');
   assert.equal(formatBasisPointsCompact(1000), '10%');
 });
+
+// Code review: "Total unavailable — retrying" was shown but nothing retried until the next edit; and the busy flag was
+// cleared after the response was drawn, which un-greyed a stale total.
+function retryHarness() {
+  const timers = [];
+  const sent = [];
+  const resolvers = [];
+  const events = [];
+  const sequencer = createQuoteSequencer({
+    debounceMs: 250,
+    retryMs: 5000,
+    setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+    clearTimer: () => { timers.length = 0; },
+    send: (draft) => {
+      sent.push(draft);
+      return new Promise((resolve, reject) => resolvers.push({ resolve, reject }));
+    },
+    onResponse: (response, draft) => events.push(`response:${draft}:${response.status}`),
+    onBusyChange: (busy) => events.push(`busy:${busy}`),
+  });
+  const tick = () => { const pending = timers.splice(0); pending.forEach((t) => t.fn()); };
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  return { sequencer, timers, sent, resolvers, events, tick, settle };
+}
+
+test('an unavailable total is retried with the same draft', async () => {
+  const h = retryHarness();
+  h.sequencer.request('a');
+  h.tick();
+  h.resolvers[0].resolve({ status: 503, body: { message: 'Total unavailable — retrying' } });
+  await h.settle();
+  assert.deepEqual(h.timers.map((t) => t.ms), [5000]);
+  h.tick();
+  h.tick();                        // the retry is debounced like an edit
+  assert.deepEqual(h.sent, ['a', 'a']);
+});
+
+test('a failed connection is retried too', async () => {
+  const h = retryHarness();
+  h.sequencer.request('a');
+  h.tick();
+  h.resolvers[0].reject(new Error('offline'));
+  await h.settle();
+  assert.deepEqual(h.timers.map((t) => t.ms), [5000]);
+});
+
+test('field errors are not retried', async () => {
+  const h = retryHarness();
+  h.sequencer.request('a');
+  h.tick();
+  h.resolvers[0].resolve({ status: 422, body: { errors: {} } });
+  await h.settle();
+  assert.deepEqual(h.timers, []);
+});
+
+test('a newer edit replaces a pending retry', async () => {
+  const h = retryHarness();
+  h.sequencer.request('a');
+  h.tick();
+  h.resolvers[0].resolve({ status: 503, body: {} });
+  await h.settle();
+  h.sequencer.request('b');
+  h.tick();
+  assert.deepEqual(h.sent, ['a', 'b']);
+});
+
+test('busy is cleared before the response is drawn', async () => {
+  const h = retryHarness();
+  h.sequencer.request('a');
+  h.tick();
+  h.resolvers[0].resolve({ status: 200, body: {} });
+  await h.settle();
+  assert.deepEqual(h.events, ['busy:true', 'busy:false', 'response:a:200']);
+});

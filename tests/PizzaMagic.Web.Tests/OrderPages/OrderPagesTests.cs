@@ -192,11 +192,12 @@ public class OrderPagesTests
         await using var factory = new WebFactory();
         var (client, details) = await DetailsAsync(factory);
 
-        var response = await WebFactory.PostFormAsync(client, $"{DetailsUrl}/Cancel", WebFactory.Token(details));
+        details.ShouldContain("name=\"version\" value=\"1\"");
+        var response = await WebFactory.PostFormAsync(client, $"{DetailsUrl}/Cancel", WebFactory.Token(details), ("version", "1"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
         response.Headers.Location!.OriginalString.ShouldBe(DetailsUrl);
-        factory.OrderManager.CancelRequests.ShouldBe([SampleOrders.Id]);
+        factory.OrderManager.CancelRequests.ShouldBe([(SampleOrders.Id, (int?)1)]);   // the version the page showed
         WebFactory.Text(await client.GetStringAsync(DetailsUrl)).ShouldContain("Your order was cancelled.");
     }
 
@@ -212,6 +213,60 @@ public class OrderPagesTests
         response.Headers.Location!.OriginalString.ShouldBe(DetailsUrl);
         WebFactory.Text(await client.GetStringAsync(DetailsUrl))
             .ShouldContain("The kitchen has already started your order, so it can't be changed or cancelled.");
+    }
+
+    // The order changed in another tab since this page was drawn: the cancel is refused (412), and the page says why.
+    [Fact]
+    public async Task Cancel_of_a_changed_order_shows_the_latest_version()
+    {
+        await using var factory = new WebFactory();
+        factory.OrderManager.Cancel = _ => ApiResult<OrderResponse>.Failed(Problems.Of(ProblemTypes.VersionMismatch, 412));
+        var (client, details) = await DetailsAsync(factory);
+
+        await WebFactory.PostFormAsync(client, $"{DetailsUrl}/Cancel", WebFactory.Token(details), ("version", "1"));
+
+        WebFactory.Text(await client.GetStringAsync(DetailsUrl)).ShouldContain("This order was changed in another window. Here's the latest version.");
+    }
+
+    // Changing an order prices it at the order's own restaurant and channel, which the service will use, not at the
+    // restaurant this web app is configured for (they differ after OrderManager:RestaurantId changes).
+    [Fact]
+    public async Task Edit_prices_at_the_orders_own_restaurant()
+    {
+        await using var factory = new WebFactory();
+        factory.OrderManager.Order = id => ApiResult<OrderResponse>.Success(SampleOrders.Order(id: id, restaurantId: 7), "\"1\"", false);
+        factory.OrderManager.Quote = _ => ApiResult<QuoteResponse>.Success(Quotes.Simple(1500, normalizedLines: [Quotes.NormalizedLarge]), null, false);
+        var (client, details) = await DetailsAsync(factory);
+        await WebFactory.PostFormAsync(client, $"{DetailsUrl}/Edit", WebFactory.Token(details));
+
+        var builder = await client.GetStringAsync("/");
+        await WebFactory.PostQuoteAsync(client, WebFactory.Token(builder), WebFactory.Draft(9, "LARGE"));
+        await WebFactory.ReviewAsync(client);
+
+        factory.OrderManager.MenuRequests.Last().ShouldBe(7);
+        factory.OrderManager.QuoteRequests.ShouldAllBe(q => q.RestaurantId == 7 && q.Channel == "ONLINE");
+        factory.OrderManager.QuoteRequests.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Details_hides_a_zero_discount()
+    {
+        await using var factory = new WebFactory();
+
+        var (_, details) = await DetailsAsync(factory);
+
+        WebFactory.Text(details).ShouldNotContain("Discounts");
+    }
+
+    [Fact]
+    public async Task Error_page_has_no_template_text()
+    {
+        await using var factory = new WebFactory();
+
+        var html = WebFactory.Text(await factory.CreateClient().GetStringAsync("/Home/Error"));
+
+        html.ShouldContain("Something went wrong");
+        html.ShouldNotContain("Development Mode");
     }
 
     [Fact]
